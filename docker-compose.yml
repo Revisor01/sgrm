@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  monitoring:
+    build: .
+    container_name: monitoring
+    restart: unless-stopped
+    volumes:
+      - /home/users/revisor/www/monitoring/config:/app/config
+      - /home/users/revisor/www/monitoring/data:/app/data
+    ports:
+      - "8080:8080"  # Wichtig für Zugriff auf die Weboberfläche
+    env_file:
+      - .env
+    environment:
+      - TZ=Europe/Berlin
+    networks:
+      - monitoring_net
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
+
+networks:
+  monitoring_net:
+    name: monitoring_net
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.131.0.0/16
