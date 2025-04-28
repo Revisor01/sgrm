@@ -127,6 +127,34 @@ class PlausibleMonitor:
         self.plausible_sites = self.config['sites']
         self.report_time = self.config['report_time']
         self.ntfy_topic = self.config['ntfy_topic']
+        self.message_template = self.config.get('message_template', 
+"""**Tagesstatistik für {site}**
+
+📊 Besucher: {visitors}
+👀 Seitenaufrufe: {pageviews}
+↩️ Absprungrate: {bounce_rate}%
+⏱️ Durchschn. Besuchsdauer: {visit_duration}s""")
+    
+    async def fetch_sites(self):
+        """Holt die verfügbaren Seiten von Plausible"""
+        try:
+            logger.info("Hole verfügbare Plausible-Seiten")
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    f"{self.plausible_url}/api/v1/sites",
+                    headers={"Authorization": f"Bearer {self.plausible_token}"}
+                ) as response:
+                    if response.status != 200:
+                        logger.error(f"Plausible API Error: {await response.text()}")
+                        return []
+                    
+                    sites = await response.json()
+                    logger.info(f"Erhaltene Sites: {len(sites)}")
+                    return [site['domain'] for site in sites]
+        except Exception as e:
+            logger.error(f"Fehler beim Holen der Plausible-Seiten: {str(e)}")
+            logger.error(traceback.format_exc())
+            return []
     
     async def check_site_stats(self, session, site):
         """Holt Statistiken für eine einzelne Website"""
@@ -148,12 +176,19 @@ class PlausibleMonitor:
                 stats = await response.json()
                 logger.info(f"Erhaltene Stats für {site}")
                 
-                message = f"""**Tagesstatistik für {site}**
-
-📊 Besucher: {stats['results']['visitors']['value']}
-👀 Seitenaufrufe: {stats['results']['pageviews']['value']}
-↩️ Absprungrate: {stats['results']['bounce_rate']['value']}%
-⏱️ Durchschn. Besuchsdauer: {int(stats['results']['visit_duration']['value'])}s"""
+                # Verwende die Nachrichtenvorlage mit Variablenersetzung
+                visitors = stats['results']['visitors']['value']
+                pageviews = stats['results']['pageviews']['value']
+                bounce_rate = stats['results']['bounce_rate']['value']
+                visit_duration = int(stats['results']['visit_duration']['value'])
+                
+                message = self.message_template.format(
+                    site=site,
+                    visitors=visitors,
+                    pageviews=pageviews,
+                    bounce_rate=bounce_rate,
+                    visit_duration=visit_duration
+                )
                 
                 status_code = self.notification_service.send_ntfy(
                     self.ntfy_topic,
@@ -162,13 +197,23 @@ class PlausibleMonitor:
                     "stats,website"
                 )
                 logger.info(f"Plausible Benachrichtigung gesendet für {site}, Status: {status_code}")
+                
+                # Speichere die geprüften Seiten
+                last_checks = DataManager.load_last_checks()
+                if 'checked_sites' not in last_checks.get('plausible', {}):
+                    last_checks['plausible']['checked_sites'] = {}
+                
+                last_checks['plausible']['checked_sites'][site] = datetime.now(
+                    pytz.timezone('Europe/Berlin')).strftime('%Y-%m-%d %H:%M:%S')
+                DataManager.save_last_checks(last_checks)
+                
                 return True
         except Exception as e:
             logger.error(f"Fehler bei Plausible-Check für {site}: {str(e)}")
             logger.error(traceback.format_exc())
             return None
     
-    async def check(self):
+    async def check(self, manual=False):
         """Prüft ob ein Tagesbericht fällig ist und sendet diesen ggf."""
         logger.info("Starte Plausible Check")
         
@@ -193,8 +238,9 @@ class PlausibleMonitor:
         logger.info(f"Heute: {today}, Letzter Report: {last_report}")
         logger.info(f"Aktuelle Stunde: {now.hour}, Minute: {now.minute}")
         
-        # Report nur senden, wenn die Zeit erreicht ist und heute noch kein Report gesendet wurde
-        if now.hour == report_hour and now.minute >= report_minute and last_report != today:
+        # Report senden, wenn die Zeit erreicht ist, heute noch kein Report gesendet wurde
+        # oder ein manueller Check angefordert wurde
+        if (manual or (now.hour == report_hour and now.minute >= report_minute and last_report != today)):
             logger.info("Starte Plausible Report...")
             
             # Parallele Anfragen für alle Sites
@@ -202,17 +248,29 @@ class PlausibleMonitor:
                 tasks = [self.check_site_stats(session, site) for site in self.plausible_sites]
                 results = await asyncio.gather(*tasks)
             
-            # Speichern des letzten Report-Datums
-            last_checks['plausible'] = {'last_report': today}
+            # Speichern des letzten Report-Datums und Zeitstempels
+            if 'plausible' not in last_checks:
+                last_checks['plausible'] = {}
+            
+            if not manual and last_report != today:
+                last_checks['plausible']['last_report'] = today
+            
+            # Speichere Zeitstempel und ob es ein manueller Check war
+            last_checks['plausible']['last_check'] = now.strftime('%Y-%m-%d %H:%M:%S')
+            last_checks['plausible']['manual'] = manual
+            
             DataManager.save_last_checks(last_checks)
-            logger.info(f"Plausible Report abgeschlossen und Datum {today} gespeichert")
+            logger.info(f"Plausible Report abgeschlossen und Zeitstempel {now.strftime('%Y-%m-%d %H:%M:%S')} gespeichert")
+            return True
         else:
             logger.info(
                 f"Kein Report nötig. "
                 f"Bedingungen: Stunde={now.hour == report_hour}, "
                 f"Minute>={now.minute >= report_minute}, "
-                f"Nicht gesendet heute={last_report != today}"
+                f"Nicht gesendet heute={last_report != today}, "
+                f"Manuell={manual}"
             )
+            return False
 
 class GitHubMonitor:
     """Überwacht GitHub Repositories auf neue Releases"""
@@ -254,9 +312,12 @@ class GitHubMonitor:
                 last_check = last_checks['github'].get(repo)
                 logger.info(f"Letzter Check für {repo}: {last_check}")
                 
+                # Immer den Zeitstempel aktualisieren, auch wenn keine Benachrichtigung gesendet wird
+                last_checks['github'][repo] = published_at
+                DataManager.save_last_checks(last_checks)
+                
                 if published_at != last_check:
                     logger.info(f"Neues Release gefunden für {repo}: {release['tag_name']}")
-                    last_checks['github'][repo] = published_at
                     
                     # Benachrichtigung senden
                     message = f"""**{release['tag_name']}** veröffentlicht!
@@ -276,9 +337,6 @@ class GitHubMonitor:
                         }
                     )
                     logger.info(f"GitHub Release Benachrichtigung gesendet für {repo}, Status: {status_code}")
-                    
-                    # Speichern der Änderungen
-                    DataManager.save_last_checks(last_checks)
                     return True
                 else:
                     logger.info(f"Kein neues Release für {repo}")
@@ -366,8 +424,37 @@ def check_plausible():
     notification_service = NotificationService(config)
     plausible_monitor = PlausibleMonitor(config, notification_service)
     
-    asyncio.run(plausible_monitor.check())
+    asyncio.run(plausible_monitor.check(manual=True))
     logger.info("Manueller Plausible-Check abgeschlossen")
+
+def load_last_checks():
+    """Lädt die letzten Checks (wird von der Web-UI aufgerufen)"""
+    return DataManager.load_last_checks()
+
+def get_sorted_repos():
+    """Gibt die nach Zeitstempel sortierten Repositories zurück"""
+    config = ConfigManager.load_config()
+    if not config or 'github' not in config or not config['github']['repos']:
+        return []
+        
+    repos = config['github']['repos']
+    last_checks = DataManager.load_last_checks()
+    
+    # Sortieren der Repos nach Zeitstempel (neueste zuerst)
+    def get_timestamp(repo):
+        timestamp = last_checks.get('github', {}).get(repo, "")
+        return timestamp if timestamp else "0000-00-00T00:00:00Z"
+    
+    sorted_repos = sorted(repos, key=get_timestamp, reverse=True)
+    return sorted_repos
+
+def get_plausible_sites():
+    """Gibt die verfügbaren Plausible-Seiten zurück"""
+    config = ConfigManager.load_config()
+    notification_service = NotificationService(config)
+    plausible_monitor = PlausibleMonitor(config, notification_service)
+    
+    return asyncio.run(plausible_monitor.fetch_sites())
 
 def main():
     """Hauptfunktion zum Starten des Monitoring-Services"""

@@ -10,7 +10,7 @@ from flask_login import LoginManager, UserMixin, login_required, login_user, log
 import secrets
 
 # Import der bestehenden Monitoring-Funktionen
-from monitoring import check_github, check_plausible, load_last_checks
+from monitoring import check_github, check_plausible, load_last_checks, get_sorted_repos, get_plausible_sites
 
 # Konfigurationsdatei
 CONFIG_FILE = "/app/config/config.yaml"
@@ -33,7 +33,13 @@ DEFAULT_CONFIG = {
         "url": "https://plausible.io",
         "sites": [],
         "report_time": "20:00",
-        "ntfy_topic": "plausible"
+        "ntfy_topic": "plausible",
+        "message_template": """**Tagesstatistik für {site}**
+
+📊 Besucher: {visitors}
+👀 Seitenaufrufe: {pageviews}
+↩️ Absprungrate: {bounce_rate}%
+⏱️ Durchschn. Besuchsdauer: {visit_duration}s"""
     },
     "ntfy": {
         "token": "",
@@ -62,7 +68,13 @@ class User(UserMixin):
 def load_config():
     try:
         with open(CONFIG_FILE, 'r') as f:
-            return yaml.safe_load(f)
+            config = yaml.safe_load(f)
+            
+            # Stelle sicher, dass alle erforderlichen Felder in der Konfiguration vorhanden sind
+            if 'plausible' in config and 'message_template' not in config['plausible']:
+                config['plausible']['message_template'] = DEFAULT_CONFIG['plausible']['message_template']
+            
+            return config
     except FileNotFoundError:
         # Erstelle Standardkonfiguration, wenn keine existiert
         with open(CONFIG_FILE, 'w') as f:
@@ -117,9 +129,15 @@ def index():
     
     # Formatiere die Datumsangaben für die Anzeige
     for repo, published_at in last_checks.get('github', {}).items():
-        if published_at:
+        if published_at and not repo.startswith('last_'):
             dt = datetime.fromisoformat(published_at.replace('Z', '+00:00'))
             last_checks['github'][repo] = dt.strftime('%d.%m.%Y %H:%M')
+    
+    # Sortierte Repositories
+    sorted_repos = get_sorted_repos()
+    
+    # Plausible geprüfte Sites
+    plausible_checked_sites = last_checks.get('plausible', {}).get('checked_sites', {})
     
     # Nächster Plausible-Report
     now = datetime.now(pytz.timezone('Europe/Berlin'))
@@ -137,7 +155,9 @@ def index():
         'index.html', 
         config=config, 
         last_checks=last_checks,
-        next_report=next_report_str
+        next_report=next_report_str,
+        sorted_repos=sorted_repos,
+        plausible_checked_sites=plausible_checked_sites
     )
 
 @app.route('/config', methods=['GET', 'POST'])
@@ -155,9 +175,24 @@ def config():
         # Plausible-Konfiguration
         config['plausible']['token'] = request.form.get('plausible_token', '')
         config['plausible']['url'] = request.form.get('plausible_url', 'https://plausible.io')
-        config['plausible']['sites'] = [s.strip() for s in request.form.get('plausible_sites', '').split(',') if s.strip()]
+        
+        # Verarbeiten der Plausible-Sites (entweder aus dem Formular oder ausgewählte Checkboxen)
+        if 'plausible_sites' in request.form:
+            # Aus Textfeld
+            config['plausible']['sites'] = [s.strip() for s in request.form.get('plausible_sites', '').split(',') if s.strip()]
+        else:
+            # Aus Checkboxen
+            selected_sites = []
+            for key, value in request.form.items():
+                if key.startswith('site_'):
+                    selected_sites.append(key.replace('site_', ''))
+            
+            if selected_sites:
+                config['plausible']['sites'] = selected_sites
+        
         config['plausible']['report_time'] = request.form.get('plausible_report_time', '20:00')
         config['plausible']['ntfy_topic'] = request.form.get('plausible_ntfy_topic', 'plausible')
+        config['plausible']['message_template'] = request.form.get('plausible_message_template', DEFAULT_CONFIG['plausible']['message_template'])
         
         # Ntfy-Konfiguration
         config['ntfy']['token'] = request.form.get('ntfy_token', '')
@@ -175,7 +210,16 @@ def config():
         return redirect(url_for('index'))
     
     config = load_config()
-    return render_template('config.html', config=config)
+    
+    # Hole verfügbare Plausible-Sites, wenn Token vorhanden
+    available_sites = []
+    if config['plausible']['token']:
+        try:
+            available_sites = get_plausible_sites()
+        except Exception as e:
+            flash(f'Fehler beim Abrufen der Plausible-Sites: {str(e)}', 'warning')
+    
+    return render_template('config.html', config=config, available_sites=available_sites)
 
 @app.route('/users', methods=['GET', 'POST'])
 @login_required

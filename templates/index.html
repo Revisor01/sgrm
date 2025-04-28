@@ -13,7 +13,29 @@
         }
         .last-check {
             font-size: 0.9em;
-            color: #6c757d;
+        }
+        .checked {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .not-checked {
+            color: #dc3545;
+        }
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            display: inline-block;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-success {
+            background-color: #28a745;
+        }
+        .status-warning {
+            background-color: #ffc107;
+        }
+        .status-danger {
+            background-color: #dc3545;
         }
     </style>
 </head>
@@ -64,10 +86,17 @@
                     <div class="card-body">
                         {% if config.github.repos %}
                             <ul class="list-group list-group-flush">
-                                {% for repo in config.github.repos %}
+                                {% for repo in sorted_repos %}
                                 <li class="list-group-item d-flex justify-content-between align-items-center">
-                                    {{ repo }}
-                                    <span class="last-check">
+                                    <div>
+                                        {% if last_checks.github and repo in last_checks.github %}
+                                            <span class="status-indicator status-success" title="Release geprüft"></span>
+                                        {% else %}
+                                            <span class="status-indicator status-danger" title="Noch nicht geprüft"></span>
+                                        {% endif %}
+                                        {{ repo }}
+                                    </div>
+                                    <span class="last-check {% if last_checks.github and repo in last_checks.github %}checked{% else %}not-checked{% endif %}">
                                         {% if last_checks.github and repo in last_checks.github %}
                                             Letztes Release: {{ last_checks.github[repo] }}
                                         {% else %}
@@ -101,8 +130,17 @@
                         {% if config.plausible.sites %}
                             <ul class="list-group list-group-flush">
                                 {% for site in config.plausible.sites %}
-                                <li class="list-group-item">
-                                    {{ site }}
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        {% if plausible_checked_sites and site in plausible_checked_sites %}
+                                            <span class="status-indicator status-success" title="Statistik geprüft"></span>
+                                        {% else %}
+                                            <span class="status-indicator status-warning" title="Noch nicht geprüft"></span>
+                                        {% endif %}
+                                        <a href="{{ config.plausible.url }}/{{ site }}" target="_blank" class="text-decoration-none">
+                                            {{ site }} <i class="fas fa-external-link-alt fa-xs"></i>
+                                        </a>
+                                    </div>
                                 </li>
                                 {% endfor %}
                             </ul>
@@ -110,6 +148,15 @@
                                 <strong>Nächster Report:</strong> {{ next_report }}
                                 (Konfiguriert für {{ config.plausible.report_time }})
                             </div>
+                            {% if last_checks.plausible and last_checks.plausible.last_check %}
+                            <div class="mt-2">
+                                <strong>Letzter Check:</strong> 
+                                <span class="checked">{{ last_checks.plausible.last_check }}</span>
+                                {% if last_checks.plausible.manual %}
+                                <span class="badge bg-info">Manuell</span>
+                                {% endif %}
+                            </div>
+                            {% endif %}
                         {% else %}
                             <div class="alert alert-warning">
                                 Keine Plausible-Websites konfiguriert.
