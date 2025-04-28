@@ -9,6 +9,17 @@ on:
   pull_request:
     branches: 
       - 'master'
+  workflow_dispatch:
+    inputs:
+      deploy_to_portainer:
+        description: 'Deploy to Portainer after build'
+        type: boolean
+        default: true
+      image_tag:
+        description: 'Custom image tag (leer lassen für latest)'
+        type: string
+        required: false
+        default: ''
 
 jobs:
   docker:
@@ -16,6 +27,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Set custom tag if provided
+        if: github.event_name == 'workflow_dispatch' && inputs.image_tag != ''
+        run: echo "CUSTOM_TAG=${{ inputs.image_tag }}" >> $GITHUB_ENV
 
       - name: Set Docker tags
         id: meta
@@ -26,6 +41,7 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ env.CUSTOM_TAG }},enable=${{ env.CUSTOM_TAG != '' }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -48,7 +64,17 @@ jobs:
           cache-to: type=gha,mode=max
           
       - name: Push to Portainer
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && (github.event_name != 'workflow_dispatch' || inputs.deploy_to_portainer)
         run: |
+          # Bestimme das Tag für den Portainer-Webhook
+          if [[ -n "${{ env.CUSTOM_TAG }}" ]]; then
+            IMAGE_TAG="${{ env.CUSTOM_TAG }}"
+          else
+            IMAGE_TAG="latest"
+          fi
+          
+          # Rufe den Portainer-Webhook auf
           curl -X POST ${{ secrets.PORTAINER_WEBHOOK_URL }} -H "Content-Type: application/json" \
-            -d '{"repository":"revisoren/monitoring:latest"}'
+            -d "{\"repository\":\"revisoren/monitoring:${IMAGE_TAG}\"}"
+          
+          echo "Deployed revisoren/monitoring:${IMAGE_TAG} to Portainer"
