@@ -1,0 +1,55 @@
+/* Monitoring Dashboard Styles */
+
+/* Globale Stile */
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Benutzerdefinierte Farbklassen für Status-Indikatoren */
+.status-indicator {
+  width: 12px;
+  height: 12px;
+  display: inline-block;
+  border-radius: 50%;
+  margin-right: 8px;
+}
+
+.status-success {
+  background-color: #28a745;
+}
+
+.status-warning {
+  background-color: #ffc107;
+}
+
+.status-danger {
+  background-color: #dc3545;
+}
+
+/* Styling für Checked-Status */
+.checked {
+  color: #28a745;
+  font-weight: bold;
+}
+
+.not-checked {
+  color: #dc3545;
+}
+
+/* Card-Styling */
+.card {
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+  transition: transform 0.2s;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+}
+
+/* Anpassungen für kleinere Bildschirme */
+@media (max-width: 768px) {
+  .container {
+    padding: 0.5rem;
+  }
+}
