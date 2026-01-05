@@ -5,114 +5,72 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ release.tag_name }} - {{ release.repo }}</title>
     <link rel="stylesheet" href="/static/releases.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
     <header>
         <div class="container">
-            <div class="header-content">
-                <a href="/releases" class="back-link"><i class="fas fa-arrow-left"></i> Alle Releases</a>
-                <h1>{{ release.repo }}</h1>
-                <p class="subtitle">{{ release.tag_name }}</p>
-            </div>
-            <button class="theme-toggle" onclick="toggleTheme()" title="Theme wechseln">
-                <i class="fas fa-moon"></i>
-            </button>
+            <h1>{{ release.repo }}</h1>
+            <button class="theme-toggle" onclick="toggleTheme()" aria-label="Theme wechseln"></button>
         </div>
     </header>
 
-    <main class="container">
-        <article class="release-detail">
-            <div class="release-header">
-                <div class="release-meta">
-                    <span class="tag-badge">
-                        <i class="fas fa-tag"></i>
-                        {{ release.tag_name }}
-                    </span>
-                    <span class="time">
-                        <i class="far fa-clock"></i>
-                        {{ release.relative_time }}
-                    </span>
+    <main>
+        <div class="container">
+            <a href="/releases" class="back-link">← Alle Releases</a>
+
+            <article class="detail">
+                <div class="detail-header">
+                    <span class="version">{{ release.tag_name }}</span>
+                    <span class="meta">{{ release.relative_time }}</span>
                     {% if release.author %}
-                    <span class="author">
+                    <span class="meta">
                         {% if release.author_avatar %}
-                        <img src="{{ release.author_avatar }}" alt="{{ release.author }}" class="avatar">
+                        <img src="{{ release.author_avatar }}" alt="{{ release.author }}">
                         {% endif %}
                         {{ release.author }}
                     </span>
                     {% endif %}
+                    <a href="{{ release.html_url }}" target="_blank" class="github-link">Auf GitHub ansehen</a>
                 </div>
 
-                <div class="release-actions">
-                    <a href="{{ release.html_url }}" target="_blank" class="btn btn-primary">
-                        <i class="fab fa-github"></i> Auf GitHub ansehen
-                    </a>
-                </div>
-            </div>
-
-            {% if release.name and release.name != release.tag_name %}
-            <h2 class="release-title">{{ release.name }}</h2>
-            {% endif %}
-
-            <div class="release-body">
-                {% if release.body_html %}
-                {{ release.body_html | safe }}
-                {% else %}
-                <p class="no-description">Keine Beschreibung vorhanden.</p>
+                {% if release.name and release.name != release.tag_name %}
+                <h2 class="detail-title">{{ release.name }}</h2>
                 {% endif %}
-            </div>
 
-            {% if release.assets %}
-            <section class="release-assets">
-                <h3><i class="fas fa-download"></i> Downloads</h3>
-                <div class="assets-list">
-                    {% for asset in release.assets %}
-                    <a href="{{ asset.download_url }}" class="asset-item" target="_blank">
-                        <div class="asset-info">
-                            <span class="asset-name">{{ asset.name }}</span>
-                            <span class="asset-size">{{ asset.size_formatted }}</span>
-                        </div>
-                        <div class="asset-stats">
-                            <span class="download-count">
-                                <i class="fas fa-download"></i>
-                                {{ asset.download_count }}
-                            </span>
-                        </div>
-                    </a>
-                    {% endfor %}
+                <div class="detail-body">
+                    {% if release.body_html %}
+                    {{ release.body_html | safe }}
+                    {% else %}
+                    <p class="no-description">Keine Beschreibung vorhanden.</p>
+                    {% endif %}
                 </div>
-            </section>
-            {% endif %}
-        </article>
-    </main>
 
-    <footer>
-        <div class="container">
-            <p>Release Tracker</p>
+                {% if release.assets %}
+                <section class="assets">
+                    <h3>Downloads</h3>
+                    <div class="assets-list">
+                        {% for asset in release.assets %}
+                        <a href="{{ asset.download_url }}" class="asset" target="_blank">
+                            <span class="asset-name">{{ asset.name }}</span>
+                            <span class="asset-meta">{{ asset.size_formatted }} · {{ asset.download_count }} Downloads</span>
+                        </a>
+                        {% endfor %}
+                    </div>
+                </section>
+                {% endif %}
+            </article>
         </div>
-    </footer>
+    </main>
 
     <script>
         function toggleTheme() {
             const html = document.documentElement;
-            const currentTheme = html.getAttribute('data-theme');
-            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            const newTheme = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
             html.setAttribute('data-theme', newTheme);
             localStorage.setItem('theme', newTheme);
-            updateThemeIcon(newTheme);
         }
-
-        function updateThemeIcon(theme) {
-            const icon = document.querySelector('.theme-toggle i');
-            icon.className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
-        }
-
-        // Load saved theme
-        const savedTheme = localStorage.getItem('theme') || 'light';
-        if (savedTheme === 'dark') {
-            document.documentElement.setAttribute('data-theme', 'dark');
-        }
-        updateThemeIcon(savedTheme);
+        const saved = localStorage.getItem('theme');
+        if (saved === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
     </script>
 </body>
 </html>
