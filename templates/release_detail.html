@@ -33,16 +33,18 @@
                     <a href="{{ release.html_url }}" target="_blank" class="github-link">Auf GitHub ansehen</a>
                 </div>
 
-                {% if release.name and release.name != release.tag_name %}
-                <h2 class="detail-title">{{ release.name }}</h2>
-                {% endif %}
-
-                <div class="detail-body">
-                    {% if release.body_html %}
-                    {{ release.body_html | safe }}
-                    {% else %}
-                    <p class="no-description">Keine Beschreibung vorhanden.</p>
+                <div class="detail-content">
+                    {% if release.name and release.name != release.tag_name %}
+                    <h2 class="detail-title">{{ release.name }}</h2>
                     {% endif %}
+
+                    <div class="detail-body">
+                        {% if release.body_html %}
+                        {{ release.body_html | safe }}
+                        {% else %}
+                        <p class="no-description">Keine Beschreibung vorhanden.</p>
+                        {% endif %}
+                    </div>
                 </div>
 
                 {% if release.assets %}

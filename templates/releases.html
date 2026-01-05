@@ -20,11 +20,15 @@
             <div class="grid">
                 {% for release in releases %}
                 <a href="/releases/{{ release.repo_slug }}" class="card">
-                    <div class="card-top">
+                    <div class="card-content">
                         <span class="repo">{{ release.repo }}</span>
                         <span class="version">{{ release.tag_name }}</span>
                     </div>
-                    <div class="card-bottom">
+                    <div class="card-footer">
+                        {% if release.author_avatar %}
+                        <img src="{{ release.author_avatar }}" alt="{{ release.author }}" class="avatar">
+                        {% endif %}
+                        <span class="author">{{ release.author or 'Unbekannt' }}</span>
                         <span class="time">{{ release.relative_time }}</span>
                     </div>
                 </a>
