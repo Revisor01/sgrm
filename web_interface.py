@@ -324,9 +324,12 @@ def releases_page():
             release_data['repo'] = repo
             release_data['repo_slug'] = repo.replace('/', '-')
             release_data['relative_time'] = format_relative_time(release_data.get('published_at', ''))
-            # Kurze Vorschau des Changelogs
+            # Markdown-Vorschau des Changelogs
             body = release_data.get('body', '')
-            release_data['body_preview'] = body[:150] + '...' if len(body) > 150 else body
+            if body:
+                # Erste 200 Zeichen als Markdown rendern
+                preview = body[:200] + ('...' if len(body) > 200 else '')
+                release_data['body_preview_html'] = render_markdown(preview)
             releases_list.append(release_data)
 
     # Sortieren nach published_at (neueste zuerst)

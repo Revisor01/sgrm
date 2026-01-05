@@ -10,14 +10,19 @@
 <body>
     <header>
         <div class="container">
-            <h1><i class="fab fa-github"></i> Release Tracker</h1>
-            <p class="subtitle">Aktuelle Releases deiner Lieblingsprojekte</p>
+            <div class="header-content">
+                <h1><i class="fab fa-github"></i> Release Tracker</h1>
+                <p class="subtitle">Aktuelle Releases deiner Lieblingsprojekte</p>
+            </div>
+            <button class="theme-toggle" onclick="toggleTheme()" title="Theme wechseln">
+                <i class="fas fa-moon"></i>
+            </button>
         </div>
     </header>
 
     <main class="container">
         {% if releases %}
-        <div class="releases-grid">
+        <div class="releases-list">
             {% for release in releases %}
             <article class="release-card">
                 <a href="/releases/{{ release.repo_slug }}" class="card-link">
@@ -34,7 +39,9 @@
                         <h3 class="release-name">{{ release.name }}</h3>
                         {% endif %}
 
-                        {% if release.body_preview %}
+                        {% if release.body_preview_html %}
+                        <div class="release-preview">{{ release.body_preview_html | safe }}</div>
+                        {% elif release.body_preview %}
                         <p class="release-preview">{{ release.body_preview }}</p>
                         {% else %}
                         <p class="release-preview no-description">Keine Beschreibung</p>
@@ -73,8 +80,31 @@
 
     <footer>
         <div class="container">
-            <p>Release Tracker &middot; Powered by GitHub API</p>
+            <p>Release Tracker</p>
         </div>
     </footer>
+
+    <script>
+        function toggleTheme() {
+            const html = document.documentElement;
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            updateThemeIcon(newTheme);
+        }
+
+        function updateThemeIcon(theme) {
+            const icon = document.querySelector('.theme-toggle i');
+            icon.className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+        }
+
+        // Load saved theme
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        if (savedTheme === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+        }
+        updateThemeIcon(savedTheme);
+    </script>
 </body>
 </html>
