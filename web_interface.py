@@ -4,13 +4,14 @@ import json
 import yaml
 from datetime import datetime
 import pytz
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import LoginManager, UserMixin, login_required, login_user, logout_user, current_user
 import secrets
 
 # Import der bestehenden Monitoring-Funktionen
-from monitoring import check_github, load_last_checks, get_sorted_repos
+from monitoring import check_github, load_last_checks, get_sorted_repos, load_releases
+import markdown
 
 # Konfigurationsdatei
 CONFIG_FILE = "/app/config/config.yaml"
@@ -33,7 +34,8 @@ DEFAULT_CONFIG = {
         "base_url": "https://ntfy.sh"
     },
     "general": {
-        "check_interval": 3600
+        "check_interval": 3600,
+        "base_url": ""
     }
 }
 
@@ -145,6 +147,7 @@ def config():
             config['general']['check_interval'] = int(request.form.get('check_interval', 3600))
         except ValueError:
             config['general']['check_interval'] = 3600
+        config['general']['base_url'] = request.form.get('base_url', '').rstrip('/')
 
         # Konfiguration speichern
         save_config(config)
@@ -234,6 +237,130 @@ def run_check():
     check_github()
     flash('GitHub-Check manuell ausgeführt!', 'success')
     return redirect(url_for('index'))
+
+# ============================================
+# Öffentliche API & Release-Seiten (kein Login)
+# ============================================
+
+def format_relative_time(iso_timestamp):
+    """Formatiert einen ISO-Timestamp als relative Zeit"""
+    try:
+        dt = datetime.fromisoformat(iso_timestamp.replace('Z', '+00:00'))
+        now = datetime.now(pytz.UTC)
+        diff = now - dt
+
+        if diff.days > 365:
+            years = diff.days // 365
+            return f"vor {years} Jahr{'en' if years > 1 else ''}"
+        elif diff.days > 30:
+            months = diff.days // 30
+            return f"vor {months} Monat{'en' if months > 1 else ''}"
+        elif diff.days > 0:
+            return f"vor {diff.days} Tag{'en' if diff.days > 1 else ''}"
+        elif diff.seconds > 3600:
+            hours = diff.seconds // 3600
+            return f"vor {hours} Stunde{'n' if hours > 1 else ''}"
+        elif diff.seconds > 60:
+            minutes = diff.seconds // 60
+            return f"vor {minutes} Minute{'n' if minutes > 1 else ''}"
+        else:
+            return "gerade eben"
+    except:
+        return iso_timestamp
+
+def render_markdown(text):
+    """Rendert Markdown zu HTML"""
+    if not text:
+        return ''
+    return markdown.markdown(text, extensions=['fenced_code', 'tables', 'nl2br'])
+
+# API-Endpunkte
+@app.route('/api/releases')
+def api_releases():
+    """API: Alle Releases"""
+    releases = load_releases()
+    config = load_config()
+    repos = config.get('github', {}).get('repos', [])
+
+    result = []
+    for repo in repos:
+        if repo in releases:
+            release_data = releases[repo].copy()
+            release_data['repo'] = repo
+            release_data['relative_time'] = format_relative_time(release_data.get('published_at', ''))
+            result.append(release_data)
+
+    # Sortieren nach published_at (neueste zuerst)
+    result.sort(key=lambda x: x.get('published_at', ''), reverse=True)
+    return jsonify(result)
+
+@app.route('/api/releases/<path:repo>')
+def api_release_detail(repo):
+    """API: Einzelnes Release"""
+    # Konvertiere slug zurück zu repo-name
+    repo_name = repo.replace('-', '/', 1)
+    releases = load_releases()
+
+    if repo_name in releases:
+        release_data = releases[repo_name].copy()
+        release_data['repo'] = repo_name
+        release_data['relative_time'] = format_relative_time(release_data.get('published_at', ''))
+        return jsonify(release_data)
+
+    return jsonify({'error': 'Release not found'}), 404
+
+# Öffentliche Web-Seiten
+@app.route('/releases')
+def releases_page():
+    """Öffentliche Übersichtsseite aller Releases"""
+    releases = load_releases()
+    config = load_config()
+    repos = config.get('github', {}).get('repos', [])
+
+    releases_list = []
+    for repo in repos:
+        if repo in releases:
+            release_data = releases[repo].copy()
+            release_data['repo'] = repo
+            release_data['repo_slug'] = repo.replace('/', '-')
+            release_data['relative_time'] = format_relative_time(release_data.get('published_at', ''))
+            # Kurze Vorschau des Changelogs
+            body = release_data.get('body', '')
+            release_data['body_preview'] = body[:150] + '...' if len(body) > 150 else body
+            releases_list.append(release_data)
+
+    # Sortieren nach published_at (neueste zuerst)
+    releases_list.sort(key=lambda x: x.get('published_at', ''), reverse=True)
+
+    return render_template('releases.html', releases=releases_list)
+
+@app.route('/releases/<path:repo_slug>')
+def release_detail_page(repo_slug):
+    """Öffentliche Detailseite für ein Release"""
+    # Konvertiere slug zurück zu repo-name
+    repo_name = repo_slug.replace('-', '/', 1)
+    releases = load_releases()
+
+    if repo_name not in releases:
+        return render_template('release_not_found.html', repo=repo_name), 404
+
+    release_data = releases[repo_name].copy()
+    release_data['repo'] = repo_name
+    release_data['repo_slug'] = repo_slug
+    release_data['relative_time'] = format_relative_time(release_data.get('published_at', ''))
+    release_data['body_html'] = render_markdown(release_data.get('body', ''))
+
+    # Formatiere Asset-Größen
+    for asset in release_data.get('assets', []):
+        size_bytes = asset.get('size', 0)
+        if size_bytes > 1024 * 1024:
+            asset['size_formatted'] = f"{size_bytes / (1024 * 1024):.1f} MB"
+        elif size_bytes > 1024:
+            asset['size_formatted'] = f"{size_bytes / 1024:.1f} KB"
+        else:
+            asset['size_formatted'] = f"{size_bytes} B"
+
+    return render_template('release_detail.html', release=release_data)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080, debug=True)

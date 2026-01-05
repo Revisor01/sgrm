@@ -93,8 +93,14 @@
                 <div class="card-body">
                     <div class="mb-3">
                         <label for="check_interval" class="form-label">Prüfintervall (Sekunden)</label>
-                        <input type="number" class="form-control" id="check_interval" name="check_interval" 
+                        <input type="number" class="form-control" id="check_interval" name="check_interval"
                                value="{{ config.general.check_interval }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="base_url" class="form-label">Base URL (für Push-Links)</label>
+                        <input type="text" class="form-control" id="base_url" name="base_url"
+                               value="{{ config.general.base_url }}" placeholder="https://releases.example.com">
+                        <div class="form-text">Öffentliche URL dieser Installation. Wird in Push-Benachrichtigungen verwendet.</div>
                     </div>
                 </div>
             </div>

@@ -5,3 +5,4 @@ pyyaml==6.0.1
 pytz==2023.3
 aiohttp==3.8.5
 werkzeug==2.3.7
+markdown==3.5

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub Releases</title>
+    <link rel="stylesheet" href="/static/releases.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1><i class="fab fa-github"></i> Release Tracker</h1>
+            <p class="subtitle">Aktuelle Releases deiner Lieblingsprojekte</p>
+        </div>
+    </header>
+
+    <main class="container">
+        {% if releases %}
+        <div class="releases-grid">
+            {% for release in releases %}
+            <article class="release-card">
+                <a href="/releases/{{ release.repo_slug }}" class="card-link">
+                    <div class="card-header">
+                        <div class="repo-info">
+                            <span class="repo-name">{{ release.repo }}</span>
+                            <span class="tag-name">{{ release.tag_name }}</span>
+                        </div>
+                        <span class="relative-time">{{ release.relative_time }}</span>
+                    </div>
+
+                    <div class="card-body">
+                        {% if release.name and release.name != release.tag_name %}
+                        <h3 class="release-name">{{ release.name }}</h3>
+                        {% endif %}
+
+                        {% if release.body_preview %}
+                        <p class="release-preview">{{ release.body_preview }}</p>
+                        {% else %}
+                        <p class="release-preview no-description">Keine Beschreibung</p>
+                        {% endif %}
+                    </div>
+
+                    <div class="card-footer">
+                        {% if release.author %}
+                        <div class="author">
+                            {% if release.author_avatar %}
+                            <img src="{{ release.author_avatar }}" alt="{{ release.author }}" class="avatar">
+                            {% endif %}
+                            <span>{{ release.author }}</span>
+                        </div>
+                        {% endif %}
+
+                        {% if release.assets %}
+                        <div class="assets-count">
+                            <i class="fas fa-download"></i>
+                            {{ release.assets|length }} Asset{% if release.assets|length != 1 %}s{% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </a>
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="fab fa-github"></i>
+            <h2>Keine Releases gefunden</h2>
+            <p>Es wurden noch keine Releases getrackt.</p>
+        </div>
+        {% endif %}
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>Release Tracker &middot; Powered by GitHub API</p>
+        </div>
+    </footer>
+</body>
+</html>

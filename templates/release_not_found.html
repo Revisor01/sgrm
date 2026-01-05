@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Release nicht gefunden</title>
+    <link rel="stylesheet" href="/static/releases.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <a href="/releases" class="back-link"><i class="fas fa-arrow-left"></i> Alle Releases</a>
+            <h1>Release nicht gefunden</h1>
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="empty-state">
+            <i class="fas fa-exclamation-circle"></i>
+            <h2>Release nicht gefunden</h2>
+            <p>Das Release für <strong>{{ repo }}</strong> wurde nicht gefunden.</p>
+            <a href="/releases" class="btn btn-primary">Zur Übersicht</a>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>Release Tracker &middot; Powered by GitHub API</p>
+        </div>
+    </footer>
+</body>
+</html>

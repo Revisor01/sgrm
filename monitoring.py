@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 CONFIG_FILE = "/app/config/config.yaml"
 DATA_DIR = "/app/data"
 LAST_CHECK_FILE = f"{DATA_DIR}/last_checks.json"
+RELEASES_FILE = f"{DATA_DIR}/releases.json"
 
 # Stellt sicher, dass die Verzeichnisse existieren
 os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
@@ -48,7 +49,7 @@ class ConfigManager:
 
 class DataManager:
     """Verwaltet die Zustandsdaten des Monitoring-Services"""
-    
+
     @staticmethod
     def load_last_checks():
         """Lädt die letzten Prüfzeitpunkte"""
@@ -61,7 +62,7 @@ class DataManager:
         except:
             logger.info("Keine vorherigen Checks gefunden, erstelle neue Datei")
             return {'github': {}}
-    
+
     @staticmethod
     def save_last_checks(data):
         """Speichert die letzten Prüfzeitpunkte"""
@@ -72,6 +73,27 @@ class DataManager:
                 logger.info("Checks erfolgreich gespeichert")
         except Exception as e:
             logger.error(f"Fehler beim Speichern der Checks: {e}")
+
+    @staticmethod
+    def load_releases():
+        """Lädt die gespeicherten Release-Daten"""
+        try:
+            with open(RELEASES_FILE, 'r') as f:
+                return json.load(f)
+        except:
+            return {}
+
+    @staticmethod
+    def save_release(repo, release_data):
+        """Speichert Release-Daten für ein Repository"""
+        try:
+            releases = DataManager.load_releases()
+            releases[repo] = release_data
+            with open(RELEASES_FILE, 'w') as f:
+                json.dump(releases, f, indent=2)
+            logger.info(f"Release-Daten für {repo} gespeichert")
+        except Exception as e:
+            logger.error(f"Fehler beim Speichern der Release-Daten: {e}")
 
 class NotificationService:
     """Stellt Benachrichtigungsdienste bereit"""
@@ -118,24 +140,25 @@ class NotificationService:
 
 class GitHubMonitor:
     """Überwacht GitHub Repositories auf neue Releases"""
-    
-    def __init__(self, config, notification_service):
+
+    def __init__(self, config, notification_service, base_url=None):
         self.config = config['github']
         self.notification_service = notification_service
         self.github_token = self.config['token']
         self.repos = self.config['repos']
         self.ntfy_topic = self.config['ntfy_topic']
-    
+        self.base_url = base_url or config.get('general', {}).get('base_url', '')
+
     async def check_repo(self, session, repo):
         """Prüft ein einzelnes Repository auf neue Releases"""
         try:
             logger.info(f"Prüfe Repository: {repo}")
-            
+
             headers = {
                 'Accept': 'application/vnd.github.v3+json',
                 'Authorization': f'token {self.github_token}'
             }
-            
+
             async with session.get(
                 f"https://api.github.com/repos/{repo}/releases/latest",
                 headers=headers
@@ -146,37 +169,67 @@ class GitHubMonitor:
                 elif response.status != 200:
                     logger.error(f"GitHub API Error für {repo}: {await response.text()}")
                     return None
-                
+
                 release = await response.json()
                 published_at = release['published_at']
-                logger.info(f"Letztes Release für {repo}: {release['tag_name']} vom {published_at}")
-                
+                tag_name = release['tag_name']
+                logger.info(f"Letztes Release für {repo}: {tag_name} vom {published_at}")
+
+                # Release-Daten für API speichern
+                release_data = {
+                    'tag_name': tag_name,
+                    'name': release.get('name', tag_name),
+                    'body': release.get('body', ''),
+                    'published_at': published_at,
+                    'html_url': release['html_url'],
+                    'author': release.get('author', {}).get('login', 'unknown'),
+                    'author_avatar': release.get('author', {}).get('avatar_url', ''),
+                    'assets': [
+                        {
+                            'name': asset['name'],
+                            'size': asset['size'],
+                            'download_url': asset['browser_download_url'],
+                            'download_count': asset['download_count']
+                        }
+                        for asset in release.get('assets', [])
+                    ]
+                }
+                DataManager.save_release(repo, release_data)
+
                 # Prüfen, ob das Release neu ist
                 last_checks = DataManager.load_last_checks()
                 last_check = last_checks['github'].get(repo)
                 logger.info(f"Letzter Check für {repo}: {last_check}")
-                
-                # Immer den Zeitstempel aktualisieren, auch wenn keine Benachrichtigung gesendet wird
+
+                # Immer den Zeitstempel aktualisieren
                 last_checks['github'][repo] = published_at
                 DataManager.save_last_checks(last_checks)
-                
+
                 if published_at != last_check:
-                    logger.info(f"Neues Release gefunden für {repo}: {release['tag_name']}")
-                    
-                    # Benachrichtigung senden
-                    message = f"""**{release['tag_name']}** veröffentlicht!
+                    logger.info(f"Neues Release gefunden für {repo}: {tag_name}")
 
-{release.get('body', 'Keine Beschreibung verfügbar')}
+                    # Link zur eigenen Release-Seite
+                    repo_slug = repo.replace('/', '-')
+                    release_url = f"{self.base_url}/releases/{repo_slug}" if self.base_url else release['html_url']
 
-[Download & Changelog]({release['html_url']})"""
-                    
+                    # Kurze Beschreibung für Push
+                    body_preview = release.get('body', '')[:200]
+                    if len(release.get('body', '')) > 200:
+                        body_preview += '...'
+
+                    message = f"""**{tag_name}** veröffentlicht!
+
+{body_preview}
+
+[Details ansehen]({release_url})"""
+
                     status_code = self.notification_service.send_ntfy(
                         self.ntfy_topic,
-                        f"🚀 Neues Release: {repo}",
+                        f"Neues Release: {repo}",
                         message,
                         "github,release",
                         extra_headers={
-                            "Click": release['html_url'],
+                            "Click": release_url,
                             "Icon": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png"
                         }
                     )
@@ -185,7 +238,7 @@ class GitHubMonitor:
                 else:
                     logger.info(f"Kein neues Release für {repo}")
                     return False
-                
+
         except Exception as e:
             logger.error(f"Fehler bei GitHub-Check für {repo}: {str(e)}")
             logger.error(traceback.format_exc())
@@ -261,6 +314,10 @@ def check_github():
 def load_last_checks():
     """Lädt die letzten Checks (wird von der Web-UI aufgerufen)"""
     return DataManager.load_last_checks()
+
+def load_releases():
+    """Lädt alle Release-Daten (wird von der Web-UI/API aufgerufen)"""
+    return DataManager.load_releases()
 
 def get_sorted_repos():
     """Gibt die nach Zeitstempel sortierten Repositories zurück"""
