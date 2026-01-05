@@ -10,7 +10,7 @@ from flask_login import LoginManager, UserMixin, login_required, login_user, log
 import secrets
 
 # Import der bestehenden Monitoring-Funktionen
-from monitoring import check_github, check_plausible, load_last_checks, get_sorted_repos, get_plausible_sites
+from monitoring import check_github, load_last_checks, get_sorted_repos
 
 # Konfigurationsdatei
 CONFIG_FILE = "/app/config/config.yaml"
@@ -27,19 +27,6 @@ DEFAULT_CONFIG = {
         "token": "",
         "repos": [],
         "ntfy_topic": "github"
-    },
-    "plausible": {
-        "token": "",
-        "url": "https://plausible.io",
-        "sites": [],
-        "report_time": "20:00",
-        "ntfy_topic": "plausible",
-        "message_template": """**Tagesstatistik für {site}**
-
-📊 Besucher: {visitors}
-👀 Seitenaufrufe: {pageviews}
-↩️ Absprungrate: {bounce_rate}%
-⏱️ Durchschn. Besuchsdauer: {visit_duration}s"""
     },
     "ntfy": {
         "token": "",
@@ -69,11 +56,6 @@ def load_config():
     try:
         with open(CONFIG_FILE, 'r') as f:
             config = yaml.safe_load(f)
-            
-            # Stelle sicher, dass alle erforderlichen Felder in der Konfiguration vorhanden sind
-            if 'plausible' in config and 'message_template' not in config['plausible']:
-                config['plausible']['message_template'] = DEFAULT_CONFIG['plausible']['message_template']
-            
             return config
     except FileNotFoundError:
         # Erstelle Standardkonfiguration, wenn keine existiert
@@ -122,42 +104,24 @@ def load_user(user_id):
 @login_required
 def index():
     config = load_config()
-    stats = {}
-    
+
     # Lade letzte Checks
     last_checks = load_last_checks()
-    
+
     # Formatiere die Datumsangaben für die Anzeige
     for repo, published_at in last_checks.get('github', {}).items():
         if published_at and not repo.startswith('last_'):
             dt = datetime.fromisoformat(published_at.replace('Z', '+00:00'))
             last_checks['github'][repo] = dt.strftime('%d.%m.%Y %H:%M')
-    
+
     # Sortierte Repositories
     sorted_repos = get_sorted_repos()
-    
-    # Plausible geprüfte Sites
-    plausible_checked_sites = last_checks.get('plausible', {}).get('checked_sites', {})
-    
-    # Nächster Plausible-Report
-    now = datetime.now(pytz.timezone('Europe/Berlin'))
-    report_time = config['plausible']['report_time']
-    report_hour = int(report_time.split(":")[0])
-    report_minute = int(report_time.split(":")[1])
-    
-    next_report = now.replace(hour=report_hour, minute=report_minute)
-    if next_report < now:
-        next_report = next_report.replace(day=now.day + 1)
-    
-    next_report_str = next_report.strftime('%d.%m.%Y %H:%M')
-    
+
     return render_template(
-        'index.html', 
-        config=config, 
+        'index.html',
+        config=config,
         last_checks=last_checks,
-        next_report=next_report_str,
-        sorted_repos=sorted_repos,
-        plausible_checked_sites=plausible_checked_sites
+        sorted_repos=sorted_repos
     )
 
 @app.route('/config', methods=['GET', 'POST'])
@@ -166,60 +130,29 @@ def config():
     if request.method == 'POST':
         # Konfiguration aktualisieren
         config = load_config()
-        
+
         # GitHub-Konfiguration
         config['github']['token'] = request.form.get('github_token', '')
         config['github']['repos'] = [r.strip() for r in request.form.get('github_repos', '').split(',') if r.strip()]
         config['github']['ntfy_topic'] = request.form.get('github_ntfy_topic', 'github')
-        
-        # Plausible-Konfiguration
-        config['plausible']['token'] = request.form.get('plausible_token', '')
-        config['plausible']['url'] = request.form.get('plausible_url', 'https://plausible.io')
-        
-        # Verarbeiten der Plausible-Sites (entweder aus dem Formular oder ausgewählte Checkboxen)
-        if 'plausible_sites' in request.form:
-            # Aus Textfeld
-            config['plausible']['sites'] = [s.strip() for s in request.form.get('plausible_sites', '').split(',') if s.strip()]
-        else:
-            # Aus Checkboxen
-            selected_sites = []
-            for key, value in request.form.items():
-                if key.startswith('site_'):
-                    selected_sites.append(key.replace('site_', ''))
-            
-            if selected_sites:
-                config['plausible']['sites'] = selected_sites
-        
-        config['plausible']['report_time'] = request.form.get('plausible_report_time', '20:00')
-        config['plausible']['ntfy_topic'] = request.form.get('plausible_ntfy_topic', 'plausible')
-        config['plausible']['message_template'] = request.form.get('plausible_message_template', DEFAULT_CONFIG['plausible']['message_template'])
-        
+
         # Ntfy-Konfiguration
         config['ntfy']['token'] = request.form.get('ntfy_token', '')
         config['ntfy']['base_url'] = request.form.get('ntfy_base_url', 'https://ntfy.sh')
-        
+
         # Allgemeine Konfiguration
         try:
             config['general']['check_interval'] = int(request.form.get('check_interval', 3600))
         except ValueError:
             config['general']['check_interval'] = 3600
-        
+
         # Konfiguration speichern
         save_config(config)
         flash('Konfiguration erfolgreich gespeichert!', 'success')
         return redirect(url_for('index'))
-    
+
     config = load_config()
-    
-    # Hole verfügbare Plausible-Sites, wenn Token vorhanden
-    available_sites = []
-    if config['plausible']['token']:
-        try:
-            available_sites = get_plausible_sites()
-        except Exception as e:
-            flash(f'Fehler beim Abrufen der Plausible-Sites: {str(e)}', 'warning')
-    
-    return render_template('config.html', config=config, available_sites=available_sites)
+    return render_template('config.html', config=config)
 
 @app.route('/users', methods=['GET', 'POST'])
 @login_required
@@ -298,15 +231,8 @@ def logout():
 @app.route('/run-check', methods=['POST'])
 @login_required
 def run_check():
-    check_type = request.form.get('check_type')
-    
-    if check_type == 'github':
-        check_github()
-        flash('GitHub-Check manuell ausgeführt!', 'success')
-    elif check_type == 'plausible':
-        check_plausible()
-        flash('Plausible-Check manuell ausgeführt!', 'success')
-    
+    check_github()
+    flash('GitHub-Check manuell ausgeführt!', 'success')
     return redirect(url_for('index'))
 
 if __name__ == '__main__':

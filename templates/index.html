@@ -44,12 +44,11 @@
 
         <div class="row">
             <!-- GitHub Monitoring -->
-            <div class="col-md-6">
+            <div class="col-12">
                 <div class="card">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h5><i class="fab fa-github"></i> GitHub Releases</h5>
                         <form method="post" action="/run-check" class="d-inline">
-                            <input type="hidden" name="check_type" value="github">
                             <button type="submit" class="btn btn-sm btn-primary">Jetzt prüfen</button>
                         </form>
                     </div>
@@ -64,7 +63,9 @@
                                         {% else %}
                                             <span class="status-indicator status-danger" title="Noch nicht geprüft"></span>
                                         {% endif %}
-                                        {{ repo }}
+                                        <a href="https://github.com/{{ repo }}/releases" target="_blank" class="text-decoration-none">
+                                            {{ repo }} <i class="fas fa-external-link-alt fa-xs"></i>
+                                        </a>
                                     </div>
                                     <span class="last-check {% if last_checks.github and repo in last_checks.github %}checked{% else %}not-checked{% endif %}">
                                         {% if last_checks.github and repo in last_checks.github %}
@@ -85,57 +86,6 @@
                     </div>
                 </div>
             </div>
-
-            <!-- Plausible Analytics -->
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5><i class="fas fa-chart-line"></i> Plausible Analytics</h5>
-                        <form method="post" action="/run-check" class="d-inline">
-                            <input type="hidden" name="check_type" value="plausible">
-                            <button type="submit" class="btn btn-sm btn-primary">Jetzt prüfen</button>
-                        </form>
-                    </div>
-                    <div class="card-body">
-                        {% if config.plausible.sites %}
-                            <ul class="list-group list-group-flush">
-                                {% for site in config.plausible.sites %}
-                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                    <div>
-                                        {% if plausible_checked_sites and site in plausible_checked_sites %}
-                                            <span class="status-indicator status-success" title="Statistik geprüft"></span>
-                                        {% else %}
-                                            <span class="status-indicator status-warning" title="Noch nicht geprüft"></span>
-                                        {% endif %}
-                                        <a href="{{ config.plausible.url }}/{{ site }}" target="_blank" class="text-decoration-none">
-                                            {{ site }} <i class="fas fa-external-link-alt fa-xs"></i>
-                                        </a>
-                                    </div>
-                                </li>
-                                {% endfor %}
-                            </ul>
-                            <div class="mt-3">
-                                <strong>Nächster Report:</strong> {{ next_report }}
-                                (Konfiguriert für {{ config.plausible.report_time }})
-                            </div>
-                            {% if last_checks.plausible and last_checks.plausible.last_check %}
-                            <div class="mt-2">
-                                <strong>Letzter Check:</strong> 
-                                <span class="checked">{{ last_checks.plausible.last_check }}</span>
-                                {% if last_checks.plausible.manual %}
-                                <span class="badge bg-info">Manuell</span>
-                                {% endif %}
-                            </div>
-                            {% endif %}
-                        {% else %}
-                            <div class="alert alert-warning">
-                                Keine Plausible-Websites konfiguriert.
-                                <a href="/config" class="alert-link">Zur Konfiguration</a>
-                            </div>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
         </div>
 
         <!-- System Status -->
@@ -147,19 +97,14 @@
                     </div>
                     <div class="card-body">
                         <div class="row">
-                            <div class="col-md-6">
+                            <div class="col-md-4">
                                 <strong>Prüfintervall:</strong> {{ config.general.check_interval }} Sekunden
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-md-4">
                                 <strong>Ntfy Base URL:</strong> {{ config.ntfy.base_url }}
                             </div>
-                        </div>
-                        <div class="row mt-2">
-                            <div class="col-md-6">
-                                <strong>GitHub Ntfy Topic:</strong> {{ config.github.ntfy_topic }}
-                            </div>
-                            <div class="col-md-6">
-                                <strong>Plausible Ntfy Topic:</strong> {{ config.plausible.ntfy_topic }}
+                            <div class="col-md-4">
+                                <strong>Ntfy Topic:</strong> {{ config.github.ntfy_topic }}
                             </div>
                         </div>
                     </div>
