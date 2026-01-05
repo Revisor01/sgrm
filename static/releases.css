@@ -8,33 +8,38 @@
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
-    background: #f0f0f0;
-    color: #1a1a1a;
-    line-height: 1.5;
+    background: #fafafa;
+    color: #111;
+    line-height: 1.6;
     min-height: 100vh;
 }
 
 [data-theme="dark"] body {
-    background: #0a0a0a;
-    color: #e5e5e5;
+    background: #0d0d0d;
+    color: #f0f0f0;
 }
 
 .container {
-    max-width: 960px;
+    max-width: 1000px;
     margin: 0 auto;
-    padding: 0 24px;
+    padding: 0 32px;
 }
 
-/* Header */
+/* Header - Sticky */
 header {
-    background: #fff;
-    border-bottom: 1px solid #ddd;
-    padding: 14px 0;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+    padding: 16px 0;
 }
 
 [data-theme="dark"] header {
-    background: #141414;
-    border-color: #2a2a2a;
+    background: rgba(13, 13, 13, 0.85);
+    border-color: rgba(255, 255, 255, 0.08);
 }
 
 header .container {
@@ -46,15 +51,21 @@ header .container {
 header .header-content {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
 }
 
 header h1 {
-    font-size: 1rem;
+    font-size: 0.95rem;
     font-weight: 600;
+    letter-spacing: -0.01em;
     display: flex;
     align-items: center;
     gap: 8px;
+}
+
+header h1 i {
+    font-size: 1.1rem;
+    opacity: 0.7;
 }
 
 header .subtitle {
@@ -64,121 +75,135 @@ header .subtitle {
 header .back-link {
     color: #666;
     text-decoration: none;
-    font-size: 0.875rem;
+    font-size: 0.85rem;
+    font-weight: 500;
     display: flex;
     align-items: center;
     gap: 6px;
+    transition: color 0.15s;
 }
 
 [data-theme="dark"] header .back-link {
-    color: #999;
+    color: #888;
 }
 
 header .back-link:hover {
-    color: #0066cc;
+    color: #000;
+}
+
+[data-theme="dark"] header .back-link:hover {
+    color: #fff;
 }
 
 .theme-toggle {
     background: transparent;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    width: 36px;
-    height: 36px;
+    border: none;
+    width: 32px;
+    height: 32px;
     cursor: pointer;
-    color: #666;
-    font-size: 1rem;
+    color: #999;
+    font-size: 0.95rem;
     display: flex;
     align-items: center;
     justify-content: center;
+    border-radius: 8px;
+    transition: background 0.15s, color 0.15s;
 }
 
-[data-theme="dark"] .theme-toggle {
-    border-color: #333;
-    color: #999;
+.theme-toggle:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: #333;
+}
+
+[data-theme="dark"] .theme-toggle:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
 }
 
 /* Main */
 main {
-    padding: 48px 0 80px;
+    padding: 64px 0 120px;
 }
 
 /* Grid */
 .releases-list {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 20px;
+    gap: 24px;
 }
 
 @media (max-width: 700px) {
     .releases-list {
         grid-template-columns: 1fr;
+        gap: 16px;
     }
 }
 
 /* Card */
 .release-card {
     background: #fff;
-    border: 1px solid #ddd;
-    border-radius: 12px;
-    transition: border-color 0.15s, box-shadow 0.15s;
+    border-radius: 16px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.03);
+    transition: transform 0.2s, box-shadow 0.2s;
 }
 
 [data-theme="dark"] .release-card {
-    background: #141414;
-    border-color: #2a2a2a;
+    background: #161616;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2), 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .release-card:hover {
-    border-color: #0066cc;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 12px 32px rgba(0, 0, 0, 0.06);
 }
 
 [data-theme="dark"] .release-card:hover {
-    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3), 0 12px 32px rgba(0, 0, 0, 0.25);
 }
 
 .release-card .card-link {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
+    display: block;
     text-decoration: none;
     color: inherit;
-    padding: 20px;
+    padding: 24px;
 }
 
 .release-card .card-header {
-    margin-bottom: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
 }
 
 .release-card .repo-name {
-    font-size: 1rem;
+    font-size: 0.95rem;
     font-weight: 600;
-    color: #0066cc;
-    margin-bottom: 8px;
+    color: #111;
+    letter-spacing: -0.01em;
 }
 
 [data-theme="dark"] .release-card .repo-name {
-    color: #4da6ff;
+    color: #f0f0f0;
 }
 
 .release-card .repo-info {
     display: flex;
     align-items: center;
-    gap: 10px;
+    justify-content: space-between;
 }
 
 .release-card .tag-name {
-    background: #e6f2ff;
-    color: #0066cc;
-    padding: 4px 12px;
-    border-radius: 100px;
+    background: #f0f0f0;
+    color: #444;
+    padding: 5px 12px;
+    border-radius: 6px;
     font-size: 0.8rem;
     font-weight: 500;
+    font-family: 'SF Mono', Monaco, monospace;
 }
 
 [data-theme="dark"] .release-card .tag-name {
-    background: #1a3352;
-    color: #4da6ff;
+    background: #252525;
+    color: #aaa;
 }
 
 .release-card .card-body {
@@ -187,17 +212,14 @@ main {
 
 .release-card .card-footer {
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    gap: 12px;
     margin-top: 16px;
-    padding-top: 16px;
-    border-top: 1px solid #eee;
     font-size: 0.8rem;
     color: #888;
 }
 
 [data-theme="dark"] .release-card .card-footer {
-    border-color: #2a2a2a;
     color: #666;
 }
 
@@ -208,13 +230,18 @@ main {
 }
 
 .release-card .avatar {
-    width: 22px;
-    height: 22px;
+    width: 20px;
+    height: 20px;
     border-radius: 50%;
 }
 
 .release-card .relative-time {
-    text-align: right;
+    margin-left: auto;
+    color: #999;
+}
+
+[data-theme="dark"] .release-card .relative-time {
+    color: #555;
 }
 
 .release-card .assets-count {
@@ -511,22 +538,9 @@ main {
     margin-bottom: 28px;
 }
 
-/* Footer */
+/* Footer - Hidden */
 footer {
-    background: #fff;
-    border-top: 1px solid #ddd;
-    padding: 20px 0;
-    text-align: center;
-}
-
-[data-theme="dark"] footer {
-    background: #141414;
-    border-color: #2a2a2a;
-}
-
-footer p {
-    color: #999;
-    font-size: 0.8rem;
+    display: none;
 }
 
 /* Mobile */
