@@ -1,117 +1,92 @@
-<!-- templates/config.html -->
 <!DOCTYPE html>
 <html lang="de">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Konfiguration - Monitoring Dashboard</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <title>Konfiguration - Release Tracker</title>
+    <link rel="stylesheet" href="/static/releases.css">
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <header>
         <div class="container">
-            <a class="navbar-brand" href="/">Monitoring Dashboard</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav">
-                    <li class="nav-item">
-                        <a class="nav-link" href="/">Dashboard</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link active" href="/config">Konfiguration</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/users">Benutzer</a>
-                    </li>
-                </ul>
-                <ul class="navbar-nav ms-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="/logout">Abmelden</a>
-                    </li>
-                </ul>
-            </div>
+            <h1>Release Tracker</h1>
+            <nav class="header-nav">
+                <a href="/" class="nav-link">Dashboard</a>
+                <a href="/releases" class="nav-link">Releases</a>
+                <a href="/config" class="nav-link active">Einstellungen</a>
+                <a href="/users" class="nav-link">Benutzer</a>
+                <a href="/logout" class="nav-link">Abmelden</a>
+            </nav>
         </div>
-    </nav>
+    </header>
 
-    <div class="container mt-4">
-        {% for category, message in get_flashed_messages(with_categories=true) %}
-        <div class="alert alert-{{ category }}">{{ message }}</div>
-        {% endfor %}
+    <main>
+        <div class="container">
+            {% for category, message in get_flashed_messages(with_categories=true) %}
+            <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
 
-        <h2>Konfiguration</h2>
-        
-        <form method="post" action="/config">
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h5><i class="fab fa-github"></i> GitHub Konfiguration</h5>
-                </div>
-                <div class="card-body">
-                    <div class="mb-3">
-                        <label for="github_token" class="form-label">GitHub Token</label>
-                        <input type="password" class="form-control" id="github_token" name="github_token" 
-                               value="{{ config.github.token }}">
-                        <div class="form-text">Personal Access Token mit Leserechten für Repositories</div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="github_repos" class="form-label">GitHub Repositories</label>
-                        <textarea class="form-control" id="github_repos" name="github_repos" rows="3">{{ config.github.repos|join(', ') }}</textarea>
-                        <div class="form-text">Repository-Namen im Format "besitzer/repo", durch Kommas getrennt</div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="github_ntfy_topic" class="form-label">Ntfy Topic</label>
-                        <input type="text" class="form-control" id="github_ntfy_topic" name="github_ntfy_topic" 
-                               value="{{ config.github.ntfy_topic }}">
+            <form method="post" action="/config">
+                <div class="admin-section">
+                    <div class="admin-section-header">GitHub</div>
+                    <div class="admin-section-body">
+                        <div class="form-group">
+                            <label for="github_token">GitHub Token</label>
+                            <input type="password" id="github_token" name="github_token" value="{{ config.github.token }}">
+                            <small class="form-hint">Personal Access Token mit Leserechten</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="github_repos">Repositories</label>
+                            <textarea id="github_repos" name="github_repos" rows="3">{{ config.github.repos|join(', ') }}</textarea>
+                            <small class="form-hint">Format: owner/repo, kommagetrennt</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="github_ntfy_topic">Ntfy Topic</label>
+                            <input type="text" id="github_ntfy_topic" name="github_ntfy_topic" value="{{ config.github.ntfy_topic }}">
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h5><i class="fas fa-bell"></i> Ntfy Konfiguration</h5>
-                </div>
-                <div class="card-body">
-                    <div class="mb-3">
-                        <label for="ntfy_token" class="form-label">Ntfy Token</label>
-                        <input type="password" class="form-control" id="ntfy_token" name="ntfy_token" 
-                               value="{{ config.ntfy.token }}">
-                    </div>
-                    <div class="mb-3">
-                        <label for="ntfy_base_url" class="form-label">Ntfy Base URL</label>
-                        <input type="text" class="form-control" id="ntfy_base_url" name="ntfy_base_url" 
-                               value="{{ config.ntfy.base_url }}">
+                <div class="admin-section">
+                    <div class="admin-section-header">Ntfy</div>
+                    <div class="admin-section-body">
+                        <div class="form-group">
+                            <label for="ntfy_token">Ntfy Token</label>
+                            <input type="password" id="ntfy_token" name="ntfy_token" value="{{ config.ntfy.token }}">
+                        </div>
+                        <div class="form-group">
+                            <label for="ntfy_base_url">Base URL</label>
+                            <input type="text" id="ntfy_base_url" name="ntfy_base_url" value="{{ config.ntfy.base_url }}">
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h5><i class="fas fa-cogs"></i> Allgemeine Einstellungen</h5>
-                </div>
-                <div class="card-body">
-                    <div class="mb-3">
-                        <label for="check_interval" class="form-label">Prüfintervall (Sekunden)</label>
-                        <input type="number" class="form-control" id="check_interval" name="check_interval"
-                               value="{{ config.general.check_interval }}">
-                    </div>
-                    <div class="mb-3">
-                        <label for="base_url" class="form-label">Base URL (für Push-Links)</label>
-                        <input type="text" class="form-control" id="base_url" name="base_url"
-                               value="{{ config.general.base_url }}" placeholder="https://releases.example.com">
-                        <div class="form-text">Öffentliche URL dieser Installation. Wird in Push-Benachrichtigungen verwendet.</div>
+                <div class="admin-section">
+                    <div class="admin-section-header">Allgemein</div>
+                    <div class="admin-section-body">
+                        <div class="form-group">
+                            <label for="check_interval">Intervall (Sekunden)</label>
+                            <input type="number" id="check_interval" name="check_interval" value="{{ config.general.check_interval }}">
+                        </div>
+                        <div class="form-group">
+                            <label for="base_url">Base URL</label>
+                            <input type="text" id="base_url" name="base_url" value="{{ config.general.base_url }}" placeholder="https://releases.example.com">
+                            <small class="form-hint">Fuer Links in Push-Benachrichtigungen</small>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="d-grid gap-2">
-                <button type="submit" class="btn btn-primary">Konfiguration speichern</button>
-                <a href="/" class="btn btn-secondary">Zurück zum Dashboard</a>
-            </div>
-        </form>
-    </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn">Speichern</button>
+                    <a href="/" class="btn btn-secondary">Abbrechen</a>
+                </div>
+            </form>
+        </div>
+    </main>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const saved = localStorage.getItem('theme');
+        if (saved === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+    </script>
 </body>
 </html>

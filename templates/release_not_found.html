@@ -5,29 +5,45 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Release nicht gefunden</title>
     <link rel="stylesheet" href="/static/releases.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
     <header>
         <div class="container">
-            <a href="/releases" class="back-link"><i class="fas fa-arrow-left"></i> Alle Releases</a>
-            <h1>Release nicht gefunden</h1>
+            <h1>Release Tracker</h1>
+            <button class="theme-toggle" onclick="toggleTheme()" aria-label="Theme wechseln">
+                <svg class="icon-light" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+                <svg class="icon-dark" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            </button>
         </div>
     </header>
 
-    <main class="container">
-        <div class="empty-state">
-            <i class="fas fa-exclamation-circle"></i>
-            <h2>Release nicht gefunden</h2>
-            <p>Das Release für <strong>{{ repo }}</strong> wurde nicht gefunden.</p>
-            <a href="/releases" class="btn btn-primary">Zur Übersicht</a>
+    <main>
+        <div class="container">
+            <a href="/releases" class="back-link">← Alle Releases</a>
+
+            <div class="not-found-box">
+                <div class="not-found-icon">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M12 8v4M12 16h.01"/>
+                    </svg>
+                </div>
+                <h2>Release nicht gefunden</h2>
+                <p>Das Release für <strong>{{ repo }}</strong> konnte nicht gefunden werden.</p>
+                <a href="/releases" class="btn">Zur Übersicht</a>
+            </div>
         </div>
     </main>
 
-    <footer>
-        <div class="container">
-            <p>Release Tracker &middot; Powered by GitHub API</p>
-        </div>
-    </footer>
+    <script>
+        function toggleTheme() {
+            const html = document.documentElement;
+            const newTheme = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+        }
+        const saved = localStorage.getItem('theme');
+        if (saved === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+    </script>
 </body>
 </html>

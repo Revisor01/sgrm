@@ -1,166 +1,124 @@
-
-<!-- templates/users.html -->
 <!DOCTYPE html>
 <html lang="de">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Benutzerverwaltung - Monitoring Dashboard</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <title>Benutzer - Release Tracker</title>
+    <link rel="stylesheet" href="/static/releases.css">
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <header>
         <div class="container">
-            <a class="navbar-brand" href="/">Monitoring Dashboard</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav">
-                    <li class="nav-item">
-                        <a class="nav-link" href="/">Dashboard</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/config">Konfiguration</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link active" href="/users">Benutzer</a>
-                    </li>
-                </ul>
-                <ul class="navbar-nav ms-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="/logout">Abmelden</a>
-                    </li>
-                </ul>
-            </div>
+            <h1>Release Tracker</h1>
+            <nav class="header-nav">
+                <a href="/" class="nav-link">Dashboard</a>
+                <a href="/releases" class="nav-link">Releases</a>
+                <a href="/config" class="nav-link">Einstellungen</a>
+                <a href="/users" class="nav-link active">Benutzer</a>
+                <a href="/logout" class="nav-link">Abmelden</a>
+            </nav>
         </div>
-    </nav>
+    </header>
 
-    <div class="container mt-4">
-        {% for category, message in get_flashed_messages(with_categories=true) %}
-        <div class="alert alert-{{ category }}">{{ message }}</div>
-        {% endfor %}
+    <main>
+        <div class="container">
+            {% for category, message in get_flashed_messages(with_categories=true) %}
+            <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
 
-        <h2>Benutzerverwaltung</h2>
-        
-        <!-- Benutzerliste -->
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5><i class="fas fa-users"></i> Benutzer</h5>
-            </div>
-            <div class="card-body">
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Benutzername</th>
-                            <th>Aktionen</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for username, user_data in users.items() %}
-                        <tr>
-                            <td>{{ username }}</td>
-                            <td>
-                                <button type="button" class="btn btn-sm btn-primary" 
-                                        data-bs-toggle="modal" data-bs-target="#changePasswordModal"
-                                        data-username="{{ username }}">
-                                    Passwort ändern
-                                </button>
-                                
-                                {% if username != 'admin' %}
-                                <form method="post" action="/users" class="d-inline">
-                                    <input type="hidden" name="action" value="delete">
-                                    <input type="hidden" name="delete_username" value="{{ username }}">
-                                    <button type="submit" class="btn btn-sm btn-danger" 
-                                            onclick="return confirm('Benutzer {{ username }} wirklich löschen?')">
-                                        Löschen
-                                    </button>
-                                </form>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-                
-                <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addUserModal">
-                    <i class="fas fa-plus"></i> Benutzer hinzufügen
-                </button>
-            </div>
-        </div>
-        
-        <div class="d-grid gap-2">
-            <a href="/" class="btn btn-secondary">Zurück zum Dashboard</a>
-        </div>
-    </div>
-    
-    <!-- Modal: Benutzer hinzufügen -->
-    <div class="modal fade" id="addUserModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Benutzer hinzufügen</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            <div class="admin-section">
+                <div class="admin-section-header">Benutzer</div>
+                <div class="admin-section-body">
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Benutzername</th>
+                                    <th>Aktionen</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for username, user_data in users.items() %}
+                                <tr>
+                                    <td>{{ username }}</td>
+                                    <td>
+                                        <button type="button" class="btn btn-sm" onclick="showPasswordModal('{{ username }}')">
+                                            Passwort
+                                        </button>
+                                        {% if username != 'admin' %}
+                                        <form method="post" action="/users" style="display: inline;">
+                                            <input type="hidden" name="action" value="delete">
+                                            <input type="hidden" name="delete_username" value="{{ username }}">
+                                            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Benutzer {{ username }} wirklich loeschen?')">
+                                                Loeschen
+                                            </button>
+                                        </form>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-                <form method="post" action="/users">
-                    <div class="modal-body">
+            </div>
+
+            <div class="admin-section">
+                <div class="admin-section-header">Neuer Benutzer</div>
+                <div class="admin-section-body">
+                    <form method="post" action="/users">
                         <input type="hidden" name="action" value="add">
-                        <div class="mb-3">
-                            <label for="username" class="form-label">Benutzername</label>
-                            <input type="text" class="form-control" id="username" name="username" required>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="username">Benutzername</label>
+                                <input type="text" id="username" name="username" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="password">Passwort</label>
+                                <input type="password" id="password" name="password" required>
+                            </div>
+                            <div class="form-group form-group-btn">
+                                <button type="submit" class="btn">Hinzufuegen</button>
+                            </div>
                         </div>
-                        <div class="mb-3">
-                            <label for="password" class="form-label">Passwort</label>
-                            <input type="password" class="form-control" id="password" name="password" required>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
-                        <button type="submit" class="btn btn-primary">Hinzufügen</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Modal: Passwort ändern -->
-    <div class="modal fade" id="changePasswordModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Passwort ändern</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </form>
                 </div>
-                <form method="post" action="/users">
-                    <div class="modal-body">
-                        <input type="hidden" name="action" value="change_password">
-                        <input type="hidden" id="password_username" name="password_username">
-                        <div class="mb-3">
-                            <label for="new_password" class="form-label">Neues Passwort</label>
-                            <input type="password" class="form-control" id="new_password" name="new_password" required>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
-                        <button type="submit" class="btn btn-primary">Passwort ändern</button>
-                    </div>
-                </form>
             </div>
+
+            <a href="/" class="btn btn-secondary">Zurueck</a>
+        </div>
+    </main>
+
+    <!-- Modal: Passwort aendern -->
+    <div class="modal" id="passwordModal">
+        <div class="modal-content">
+            <h3>Passwort aendern</h3>
+            <form method="post" action="/users">
+                <input type="hidden" name="action" value="change_password">
+                <input type="hidden" id="password_username" name="password_username">
+                <div class="form-group">
+                    <label for="new_password">Neues Passwort</label>
+                    <input type="password" id="new_password" name="new_password" required>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn">Speichern</button>
+                    <button type="button" class="btn btn-secondary" onclick="hidePasswordModal()">Abbrechen</button>
+                </div>
+            </form>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Benutzernamen an Modal übergeben
-        const changePasswordModal = document.getElementById('changePasswordModal')
-        if (changePasswordModal) {
-            changePasswordModal.addEventListener('show.bs.modal', event => {
-                const button = event.relatedTarget
-                const username = button.getAttribute('data-username')
-                const usernameInput = changePasswordModal.querySelector('#password_username')
-                usernameInput.value = username
-            })
+        const saved = localStorage.getItem('theme');
+        if (saved === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+
+        function showPasswordModal(username) {
+            document.getElementById('password_username').value = username;
+            document.getElementById('passwordModal').classList.add('active');
+        }
+
+        function hidePasswordModal() {
+            document.getElementById('passwordModal').classList.remove('active');
         }
     </script>
 </body>

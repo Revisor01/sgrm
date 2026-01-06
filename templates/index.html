@@ -1,118 +1,96 @@
-<!-- templates/index.html -->
 <!DOCTYPE html>
 <html lang="de">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monitoring Dashboard</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="/static/style.css">
+    <title>Dashboard - Release Tracker</title>
+    <link rel="stylesheet" href="/static/releases.css">
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <header>
         <div class="container">
-            <a class="navbar-brand" href="/">Monitoring Dashboard</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav">
-                    <li class="nav-item">
-                        <a class="nav-link" href="/">Dashboard</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/config">Konfiguration</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/users">Benutzer</a>
-                    </li>
-                </ul>
-                <ul class="navbar-nav ms-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="/logout">Abmelden</a>
-                    </li>
-                </ul>
-            </div>
+            <h1>Release Tracker</h1>
+            <nav class="header-nav">
+                <a href="/" class="nav-link active">Dashboard</a>
+                <a href="/releases" class="nav-link">Releases</a>
+                <a href="/config" class="nav-link">Einstellungen</a>
+                <a href="/users" class="nav-link">Benutzer</a>
+                <a href="/logout" class="nav-link">Abmelden</a>
+            </nav>
         </div>
-    </nav>
+    </header>
 
-    <div class="container mt-4">
-        {% for category, message in get_flashed_messages(with_categories=true) %}
-        <div class="alert alert-{{ category }}">{{ message }}</div>
-        {% endfor %}
+    <main>
+        <div class="container">
+            {% for category, message in get_flashed_messages(with_categories=true) %}
+            <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
 
-        <div class="row">
-            <!-- GitHub Monitoring -->
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5><i class="fab fa-github"></i> GitHub Releases</h5>
-                        <form method="post" action="/run-check" class="d-inline">
-                            <button type="submit" class="btn btn-sm btn-primary">Jetzt prüfen</button>
-                        </form>
-                    </div>
-                    <div class="card-body">
-                        {% if config.github.repos %}
-                            <ul class="list-group list-group-flush">
-                                {% for repo in sorted_repos %}
-                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                    <div>
-                                        {% if last_checks.github and repo in last_checks.github %}
-                                            <span class="status-indicator status-success" title="Release geprüft"></span>
-                                        {% else %}
-                                            <span class="status-indicator status-danger" title="Noch nicht geprüft"></span>
-                                        {% endif %}
-                                        <a href="https://github.com/{{ repo }}/releases" target="_blank" class="text-decoration-none">
-                                            {{ repo }} <i class="fas fa-external-link-alt fa-xs"></i>
-                                        </a>
-                                    </div>
-                                    <span class="last-check {% if last_checks.github and repo in last_checks.github %}checked{% else %}not-checked{% endif %}">
-                                        {% if last_checks.github and repo in last_checks.github %}
-                                            Letztes Release: {{ last_checks.github[repo] }}
-                                        {% else %}
-                                            Noch nicht geprüft
-                                        {% endif %}
-                                    </span>
-                                </li>
-                                {% endfor %}
-                            </ul>
-                        {% else %}
-                            <div class="alert alert-warning">
-                                Keine GitHub-Repositories konfiguriert.
-                                <a href="/config" class="alert-link">Zur Konfiguration</a>
+            <div class="admin-section">
+                <div class="admin-section-header">
+                    <span>GitHub Releases</span>
+                    <form method="post" action="/run-check" style="display: inline; margin-left: auto;">
+                        <button type="submit" class="btn btn-sm">Jetzt pruefen</button>
+                    </form>
+                </div>
+                <div class="admin-section-body">
+                    {% if config.github.repos %}
+                    <div class="repo-list">
+                        {% for repo in sorted_repos %}
+                        <div class="repo-item">
+                            <div class="repo-status">
+                                {% if last_checks.github and repo in last_checks.github %}
+                                <span class="status-dot status-ok"></span>
+                                {% else %}
+                                <span class="status-dot status-pending"></span>
+                                {% endif %}
                             </div>
-                        {% endif %}
+                            <div class="repo-info">
+                                <a href="https://github.com/{{ repo }}/releases" target="_blank" class="repo-link">{{ repo }}</a>
+                                <span class="repo-date">
+                                    {% if last_checks.github and repo in last_checks.github %}
+                                    {{ last_checks.github[repo] }}
+                                    {% else %}
+                                    Noch nicht geprueft
+                                    {% endif %}
+                                </span>
+                            </div>
+                        </div>
+                        {% endfor %}
                     </div>
+                    {% else %}
+                    <div class="empty-hint">
+                        Keine Repositories konfiguriert. <a href="/config">Zur Konfiguration</a>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
-        </div>
 
-        <!-- System Status -->
-        <div class="row mt-3">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header">
-                        <h5><i class="fas fa-cogs"></i> System Status</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-4">
-                                <strong>Prüfintervall:</strong> {{ config.general.check_interval }} Sekunden
-                            </div>
-                            <div class="col-md-4">
-                                <strong>Ntfy Base URL:</strong> {{ config.ntfy.base_url }}
-                            </div>
-                            <div class="col-md-4">
-                                <strong>Ntfy Topic:</strong> {{ config.github.ntfy_topic }}
-                            </div>
+            <div class="admin-section">
+                <div class="admin-section-header">System</div>
+                <div class="admin-section-body">
+                    <div class="status-grid">
+                        <div class="status-item">
+                            <span class="status-label">Intervall</span>
+                            <span class="status-value">{{ config.general.check_interval }}s</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Ntfy URL</span>
+                            <span class="status-value">{{ config.ntfy.base_url }}</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Topic</span>
+                            <span class="status-value">{{ config.github.ntfy_topic }}</span>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
+    </main>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const saved = localStorage.getItem('theme');
+        if (saved === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+    </script>
 </body>
 </html>
