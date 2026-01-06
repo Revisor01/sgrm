@@ -133,9 +133,8 @@ def config():
         # Konfiguration aktualisieren
         config = load_config()
 
-        # GitHub-Konfiguration
+        # GitHub-Konfiguration (Repos werden separat verwaltet)
         config['github']['token'] = request.form.get('github_token', '')
-        config['github']['repos'] = [r.strip() for r in request.form.get('github_repos', '').split(',') if r.strip()]
         config['github']['ntfy_topic'] = request.form.get('github_ntfy_topic', 'github')
 
         # Ntfy-Konfiguration
@@ -152,10 +151,40 @@ def config():
         # Konfiguration speichern
         save_config(config)
         flash('Konfiguration erfolgreich gespeichert!', 'success')
-        return redirect(url_for('index'))
+        return redirect(url_for('config'))
 
     config = load_config()
     return render_template('config.html', config=config)
+
+@app.route('/config/repo/add', methods=['POST'])
+@login_required
+def add_repo():
+    repo = request.form.get('repo', '').strip()
+    if repo:
+        # Validierung: muss owner/repo Format haben
+        if '/' in repo and len(repo.split('/')) == 2:
+            config = load_config()
+            if repo not in config['github']['repos']:
+                config['github']['repos'].append(repo)
+                save_config(config)
+                flash(f'Repository "{repo}" hinzugefügt.', 'success')
+            else:
+                flash(f'Repository "{repo}" ist bereits in der Liste.', 'danger')
+        else:
+            flash('Ungültiges Format. Bitte "owner/repo" verwenden.', 'danger')
+    return redirect(url_for('config'))
+
+@app.route('/config/repo/remove', methods=['POST'])
+@login_required
+def remove_repo():
+    repo = request.form.get('repo', '').strip()
+    if repo:
+        config = load_config()
+        if repo in config['github']['repos']:
+            config['github']['repos'].remove(repo)
+            save_config(config)
+            flash(f'Repository "{repo}" entfernt.', 'success')
+    return redirect(url_for('config'))
 
 @app.route('/users', methods=['GET', 'POST'])
 @login_required
