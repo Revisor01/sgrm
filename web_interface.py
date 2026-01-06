@@ -161,8 +161,26 @@ def config():
 def add_repo():
     repo = request.form.get('repo', '').strip()
     if repo:
+        # GitHub URL zu owner/repo konvertieren
+        if repo.startswith('https://github.com/'):
+            repo = repo.replace('https://github.com/', '')
+        elif repo.startswith('http://github.com/'):
+            repo = repo.replace('http://github.com/', '')
+        elif repo.startswith('github.com/'):
+            repo = repo.replace('github.com/', '')
+
+        # Trailing slashes und .git entfernen
+        repo = repo.rstrip('/')
+        if repo.endswith('.git'):
+            repo = repo[:-4]
+
+        # Nur owner/repo behalten (falls weitere Pfade wie /releases dabei sind)
+        parts = repo.split('/')
+        if len(parts) >= 2:
+            repo = f"{parts[0]}/{parts[1]}"
+
         # Validierung: muss owner/repo Format haben
-        if '/' in repo and len(repo.split('/')) == 2:
+        if '/' in repo and len(repo.split('/')) == 2 and all(repo.split('/')):
             config = load_config()
             if repo not in config['github']['repos']:
                 config['github']['repos'].append(repo)
@@ -171,7 +189,7 @@ def add_repo():
             else:
                 flash(f'Repository "{repo}" ist bereits in der Liste.', 'danger')
         else:
-            flash('Ungültiges Format. Bitte "owner/repo" verwenden.', 'danger')
+            flash('Ungültiges Format. Bitte "owner/repo" oder GitHub-URL verwenden.', 'danger')
     return redirect(url_for('config'))
 
 @app.route('/config/repo/remove', methods=['POST'])
