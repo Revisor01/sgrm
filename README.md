@@ -52,7 +52,3 @@ Nach dem ersten Start:
 3. GitHub Token eintragen (optional, erhöht Rate Limit)
 4. Repositories hinzufügen (URL oder `owner/repo`)
 5. ntfy Topic konfigurieren
-
-## Lizenz
-
-AGPL-3.0 - siehe [LICENSE](LICENSE)
