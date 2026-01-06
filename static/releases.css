@@ -152,8 +152,8 @@ main {
 }
 
 .card .version {
-    background: #dbeafe;
-    color: #1e40af;
+    background: #ffe4e6;
+    color: #9f1239;
     font-size: 12px;
     font-weight: 500;
     padding: 5px 10px;
@@ -163,8 +163,8 @@ main {
 }
 
 [data-theme="dark"] .card .version {
-    background: #1e3a5f;
-    color: #93c5fd;
+    background: #4c0519;
+    color: #fda4af;
 }
 
 .card-footer {
@@ -313,8 +313,8 @@ main {
 }
 
 .detail-header .version {
-    background: #dbeafe;
-    color: #1e40af;
+    background: #ffe4e6;
+    color: #9f1239;
     font-size: 13px;
     font-weight: 500;
     padding: 6px 14px;
@@ -323,8 +323,8 @@ main {
 }
 
 [data-theme="dark"] .detail-header .version {
-    background: #1e3a5f;
-    color: #93c5fd;
+    background: #4c0519;
+    color: #fda4af;
 }
 
 .detail-header .meta {
