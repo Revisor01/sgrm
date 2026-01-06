@@ -144,16 +144,16 @@ main {
 .card .repo {
     font-size: 15px;
     font-weight: 600;
-    color: #6d5a7a;
+    color: #18181b;
 }
 
 [data-theme="dark"] .card .repo {
-    color: #c4b5d0;
+    color: #fafafa;
 }
 
 .card .version {
-    background: #f0ece3;
-    color: #78716c;
+    background: #dbeafe;
+    color: #1e40af;
     font-size: 12px;
     font-weight: 500;
     padding: 5px 10px;
@@ -163,8 +163,8 @@ main {
 }
 
 [data-theme="dark"] .card .version {
-    background: #292524;
-    color: #a8a29e;
+    background: #1e3a5f;
+    color: #93c5fd;
 }
 
 .card-footer {
@@ -210,7 +210,7 @@ main {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    color: #6d5a7a;
+    color: #7c3aed;
     text-decoration: none;
     font-size: 14px;
     font-weight: 500;
@@ -218,7 +218,7 @@ main {
 }
 
 [data-theme="dark"] .back-link {
-    color: #c4b5d0;
+    color: #a78bfa;
 }
 
 .back-link:hover {
@@ -251,8 +251,8 @@ main {
 }
 
 .detail-header .version {
-    background: #f0ece3;
-    color: #78716c;
+    background: #dbeafe;
+    color: #1e40af;
     font-size: 13px;
     font-weight: 500;
     padding: 6px 14px;
@@ -261,8 +261,8 @@ main {
 }
 
 [data-theme="dark"] .detail-header .version {
-    background: #292524;
-    color: #a8a29e;
+    background: #1e3a5f;
+    color: #93c5fd;
 }
 
 .detail-header .meta {
@@ -281,7 +281,7 @@ main {
 
 .detail-header .github-link {
     margin-left: auto;
-    background: #6d5a7a;
+    background: #7c3aed;
     color: #fff;
     padding: 9px 18px;
     border-radius: 8px;
@@ -292,11 +292,11 @@ main {
 }
 
 [data-theme="dark"] .detail-header .github-link {
-    background: #7c6a8a;
+    background: #8b5cf6;
 }
 
 .detail-header .github-link:hover {
-    background: #5a4a66;
+    background: #6d28d9;
 }
 
 .detail-content {
@@ -383,11 +383,11 @@ main {
 }
 
 .detail-body a {
-    color: #6d5a7a;
+    color: #7c3aed;
 }
 
 [data-theme="dark"] .detail-body a {
-    color: #c4b5d0;
+    color: #a78bfa;
 }
 
 .no-description {
@@ -449,11 +449,11 @@ main {
 .asset-name {
     font-weight: 500;
     font-size: 14px;
-    color: #6d5a7a;
+    color: #7c3aed;
 }
 
 [data-theme="dark"] .asset-name {
-    color: #c4b5d0;
+    color: #a78bfa;
 }
 
 .asset-meta {
