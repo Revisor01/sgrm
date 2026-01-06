@@ -36,7 +36,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: revisoren/monitoring
+          images: revisoren/sgrm
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -75,6 +75,6 @@ jobs:
           
           # Rufe den Portainer-Webhook auf
           curl -X POST ${{ secrets.PORTAINER_WEBHOOK_URL }} -H "Content-Type: application/json" \
-            -d "{\"repository\":\"revisoren/monitoring:${IMAGE_TAG}\"}"
-          
-          echo "Deployed revisoren/monitoring:${IMAGE_TAG} to Portainer"
+            -d "{\"repository\":\"revisoren/sgrm:${IMAGE_TAG}\"}"
+
+          echo "Deployed revisoren/sgrm:${IMAGE_TAG} to Portainer"
