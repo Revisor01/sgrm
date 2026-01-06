@@ -1,6 +1,6 @@
-# Release Tracker
+# SGRM - Simple GitHub Release Monitor
 
-Ein einfacher GitHub Release Tracker mit Web-Dashboard und Push-Benachrichtigungen via ntfy.sh.
+Ein einfacher GitHub Release Monitor mit Web-Dashboard und Push-Benachrichtigungen via ntfy.sh.
 
 ## Features
 
@@ -15,11 +15,11 @@ Ein einfacher GitHub Release Tracker mit Web-Dashboard und Push-Benachrichtigung
 
 ```bash
 docker run -d \
-  --name release-tracker \
+  --name sgrm \
   -p 8080:8080 \
   -v ./config:/app/config \
   -v ./data:/app/data \
-  revisoren/monitoring
+  revisoren/sgrm
 ```
 
 Dann öffne http://localhost:8080 und melde dich mit `admin` / `admin` an.
@@ -29,8 +29,8 @@ Dann öffne http://localhost:8080 und melde dich mit `admin` / `admin` an.
 ```yaml
 version: '3'
 services:
-  release-tracker:
-    image: revisoren/monitoring
+  sgrm:
+    image: revisoren/sgrm
     ports:
       - "8080:8080"
     volumes:
