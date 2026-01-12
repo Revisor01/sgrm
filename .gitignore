@@ -1,0 +1,10 @@
+# Local settings
+.claude/
+
+# Python
+__pycache__/
+*.pyc
+
+# Config & Data (deployed via Docker volumes)
+config/
+data/
