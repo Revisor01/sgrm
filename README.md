@@ -86,7 +86,14 @@ SGRM bietet eine einfache JSON-API:
 ```
 GET /api/releases          # Alle Releases
 GET /api/releases/{slug}   # Einzelnes Release (z.B. owner-repo)
+GET /health                # Healthcheck (für Docker/Uptime-Monitoring)
 ```
+
+## Hinweise
+
+- Beim ersten Check eines neu hinzugefügten Repositories wird nur eine Baseline gesetzt — benachrichtigt wird erst ab dem nächsten neuen Release.
+- Konfigurationsänderungen (Repos, Intervall, Token) wirken ohne Neustart ab dem nächsten Prüfzyklus.
+- Release-Notes werden serverseitig sanitisiert (XSS-Schutz auf den öffentlichen Seiten).
 
 ## Lizenz
 

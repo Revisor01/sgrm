@@ -5,13 +5,15 @@ import yaml
 from datetime import datetime
 import pytz
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask_wtf.csrf import CSRFProtect
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import LoginManager, UserMixin, login_required, login_user, logout_user, current_user
 import secrets
 
 # Import der bestehenden Monitoring-Funktionen
-from monitoring import check_github, load_last_checks, get_sorted_repos, load_releases
+from monitoring import check_github, load_last_checks, get_sorted_repos, load_releases, DataManager
 import markdown
+import nh3
 
 # Konfigurationsdatei
 CONFIG_FILE = "/app/config/config.yaml"
@@ -39,9 +41,27 @@ DEFAULT_CONFIG = {
     }
 }
 
+# Persistenter Secret Key, damit Sessions einen Container-Neustart überleben
+SECRET_KEY_FILE = os.path.join(os.path.dirname(CONFIG_FILE), "secret_key")
+
+def get_secret_key():
+    try:
+        with open(SECRET_KEY_FILE, 'r') as f:
+            key = f.read().strip()
+            if key:
+                return key
+    except FileNotFoundError:
+        pass
+    key = secrets.token_hex(32)
+    with open(SECRET_KEY_FILE, 'w') as f:
+        f.write(key)
+    os.chmod(SECRET_KEY_FILE, 0o600)
+    return key
+
 # Flask App initialisieren
 app = Flask(__name__)
-app.secret_key = secrets.token_hex(16)
+app.secret_key = get_secret_key()
+csrf = CSRFProtect(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "login"
@@ -201,6 +221,7 @@ def remove_repo():
         if repo in config['github']['repos']:
             config['github']['repos'].remove(repo)
             save_config(config)
+            DataManager.remove_repo_data(repo)
             flash(f'Repository "{repo}" entfernt.', 'success')
     return redirect(url_for('config'))
 
@@ -281,9 +302,17 @@ def logout():
 @app.route('/run-check', methods=['POST'])
 @login_required
 def run_check():
-    check_github()
-    flash('GitHub-Check manuell ausgeführt!', 'success')
+    try:
+        check_github()
+        flash('GitHub-Check manuell ausgeführt!', 'success')
+    except Exception as e:
+        flash(f'Fehler beim GitHub-Check: {e}', 'danger')
     return redirect(url_for('index'))
+
+@app.route('/health')
+def health():
+    """Healthcheck-Endpoint für Docker/Monitoring"""
+    return jsonify({'status': 'ok'})
 
 # ============================================
 # Öffentliche API & Release-Seiten (kein Login)
@@ -316,10 +345,11 @@ def format_relative_time(iso_timestamp):
         return iso_timestamp
 
 def render_markdown(text):
-    """Rendert Markdown zu HTML"""
+    """Rendert Markdown zu HTML und sanitisiert das Ergebnis (Release-Notes sind Fremdinhalt)"""
     if not text:
         return ''
-    return markdown.markdown(text, extensions=['fenced_code', 'tables', 'nl2br'])
+    html = markdown.markdown(text, extensions=['fenced_code', 'tables', 'nl2br'])
+    return nh3.clean(html)
 
 # API-Endpunkte
 @app.route('/api/releases')
@@ -423,5 +453,10 @@ def release_detail_page(repo_slug):
 
     return render_template('release_detail.html', release=release_data)
 
+# Beim Start Standard-Konfiguration und Admin-User anlegen, falls noch nicht vorhanden
+load_config()
+load_users()
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8080, debug=True)
+    from waitress import serve
+    serve(app, host='0.0.0.0', port=8080, threads=8)

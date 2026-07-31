@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 import requests
 import json
-import time
 import os
 import logging
-from datetime import datetime, timedelta
-import pytz
+from datetime import datetime
 import traceback
 import yaml
 import asyncio
@@ -95,37 +93,58 @@ class DataManager:
         except Exception as e:
             logger.error(f"Fehler beim Speichern der Release-Daten: {e}")
 
+    @staticmethod
+    def remove_repo_data(repo):
+        """Entfernt gespeicherte Daten eines Repositories (Release + letzter Check)"""
+        try:
+            releases = DataManager.load_releases()
+            if repo in releases:
+                del releases[repo]
+                with open(RELEASES_FILE, 'w') as f:
+                    json.dump(releases, f, indent=2)
+
+            last_checks = DataManager.load_last_checks()
+            if repo in last_checks.get('github', {}):
+                del last_checks['github'][repo]
+                DataManager.save_last_checks(last_checks)
+
+            logger.info(f"Daten für {repo} entfernt")
+        except Exception as e:
+            logger.error(f"Fehler beim Entfernen der Daten für {repo}: {e}")
+
 class NotificationService:
     """Stellt Benachrichtigungsdienste bereit"""
     
     def __init__(self, config):
         self.config = config
-        self.ntfy_token = config['ntfy']['token']
-        self.ntfy_base_url = config['ntfy']['base_url']
-    
+        self.ntfy_token = config.get('ntfy', {}).get('token', '')
+        self.ntfy_base_url = config.get('ntfy', {}).get('base_url', 'https://ntfy.sh').rstrip('/')
+
     def send_ntfy(self, topic, title, message, tags=None, priority="default", extra_headers=None):
         """Sendet eine Benachrichtigung über ntfy.sh"""
         try:
             logger.info(f"Sende ntfy Nachricht an Topic {topic}")
             logger.debug(f"Title: {title}")
             logger.debug(f"Message: {message}")
-            
+
             headers = {
-                "Authorization": f"Bearer {self.ntfy_token}",
                 "Title": title.encode('utf-8'),
                 "Tags": (tags or "").encode('utf-8'),
                 "Priority": priority,
                 "Markdown": "true"
             }
-            
+            if self.ntfy_token:
+                headers["Authorization"] = f"Bearer {self.ntfy_token}"
+
             if extra_headers:
-                headers.update({k: v.encode('utf-8') if isinstance(v, str) else v 
+                headers.update({k: v.encode('utf-8') if isinstance(v, str) else v
                              for k, v in extra_headers.items()})
-            
+
             response = requests.post(
                 f"{self.ntfy_base_url}/{topic}",
                 headers=headers,
-                data=message.encode('utf-8')
+                data=message.encode('utf-8'),
+                timeout=15
             )
             
             logger.info(f"ntfy Response Status: {response.status_code}")
@@ -142,11 +161,11 @@ class GitHubMonitor:
     """Überwacht GitHub Repositories auf neue Releases"""
 
     def __init__(self, config, notification_service, base_url=None):
-        self.config = config['github']
+        self.config = config.get('github', {})
         self.notification_service = notification_service
-        self.github_token = self.config['token']
-        self.repos = self.config['repos']
-        self.ntfy_topic = self.config['ntfy_topic']
+        self.github_token = self.config.get('token', '')
+        self.repos = self.config.get('repos', []) or []
+        self.ntfy_topic = self.config.get('ntfy_topic', 'github')
         self.base_url = base_url or config.get('general', {}).get('base_url', '')
 
     async def check_repo(self, session, repo):
@@ -165,10 +184,19 @@ class GitHubMonitor:
                 headers=headers
             ) as response:
                 if response.status == 404:
-                    logger.warning(f"Repository nicht gefunden: {repo}")
+                    logger.warning(f"Repository nicht gefunden oder keine Releases vorhanden: {repo}")
+                    return None
+                elif response.status in (403, 429) and response.headers.get('X-RateLimit-Remaining') == '0':
+                    reset = response.headers.get('X-RateLimit-Reset', '')
+                    try:
+                        reset_time = datetime.fromtimestamp(int(reset)).strftime('%H:%M:%S')
+                    except (ValueError, TypeError):
+                        reset_time = 'unbekannt'
+                    logger.error(f"GitHub Rate Limit erreicht (Reset um {reset_time}). "
+                                 f"Tipp: GitHub Token konfigurieren erhöht das Limit auf 5000/h.")
                     return None
                 elif response.status != 200:
-                    logger.error(f"GitHub API Error für {repo}: {await response.text()}")
+                    logger.error(f"GitHub API Error für {repo} (HTTP {response.status}): {await response.text()}")
                     return None
 
                 release = await response.json()
@@ -206,7 +234,11 @@ class GitHubMonitor:
                 last_checks['github'][repo] = published_at
                 DataManager.save_last_checks(last_checks)
 
-                if published_at != last_check:
+                if last_check is None:
+                    # Erster Check für dieses Repo: Baseline setzen, nicht benachrichtigen
+                    logger.info(f"Erster Check für {repo}, Baseline: {tag_name} (keine Benachrichtigung)")
+                    return False
+                elif published_at != last_check:
                     logger.info(f"Neues Release gefunden für {repo}: {tag_name}")
 
                     # Link zur eigenen Release-Seite
@@ -248,58 +280,43 @@ class GitHubMonitor:
     async def check(self):
         """Prüft alle konfigurierten Repositories auf neue Releases"""
         logger.info("Starte GitHub Release Check")
-        
+
         # Parallele Anfragen für alle Repositories
-        async with aiohttp.ClientSession() as session:
+        timeout = aiohttp.ClientTimeout(total=30)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
             tasks = [self.check_repo(session, repo) for repo in self.repos]
-            results = await asyncio.gather(*tasks)
-        
+            await asyncio.gather(*tasks)
+
         logger.info("GitHub-Check abgeschlossen")
 
 class MonitoringService:
     """Hauptklasse des Monitoring-Services"""
-    
-    def __init__(self):
-        self.config = ConfigManager.load_config()
-        
-        if not self.config:
-            logger.critical("Keine Konfiguration gefunden, beende")
-            return
-        
-        self.notification_service = NotificationService(self.config)
-        self.github_monitor = GitHubMonitor(self.config, self.notification_service)
 
-        self.check_interval = self.config['general']['check_interval']
-    
-    async def run_checks(self):
-        """Führt alle Checks aus"""
-        try:
-            await self.github_monitor.check()
-        except Exception as e:
-            logger.error(f"Fehler bei der Ausführung der Checks: {str(e)}")
-            logger.error(traceback.format_exc())
-    
     async def start(self):
-        """Startet den Monitoring-Service"""
-        try:
-            logger.info("Monitoring Service gestartet")
-            logger.info(f"Konfiguration:")
-            logger.info(f"  GITHUB_REPOS: {self.config['github']['repos']}")
-            logger.info(f"  CHECK_INTERVAL: {self.check_interval}")
-            
-            while True:
-                try:
-                    await self.run_checks()
-                    logger.info(f"Warte {self.check_interval} Sekunden...")
-                    await asyncio.sleep(self.check_interval)
-                except Exception as e:
-                    logger.error(f"Fehler im Hauptloop: {str(e)}")
-                    logger.error(traceback.format_exc())
-                    await asyncio.sleep(60)
-                    
-        except Exception as e:
-            logger.critical(f"Kritischer Fehler: {str(e)}")
-            logger.critical(traceback.format_exc())
+        """Startet den Monitoring-Service. Die Konfiguration wird vor jedem
+        Durchlauf neu geladen, damit Änderungen aus der Web-UI ohne Neustart wirken."""
+        logger.info("Monitoring Service gestartet")
+
+        while True:
+            interval = 3600
+            try:
+                config = ConfigManager.load_config()
+                if not config:
+                    logger.warning("Keine Konfiguration gefunden, versuche es in 30 Sekunden erneut")
+                    await asyncio.sleep(30)
+                    continue
+
+                interval = config.get('general', {}).get('check_interval', 3600)
+                notification_service = NotificationService(config)
+                github_monitor = GitHubMonitor(config, notification_service)
+                await github_monitor.check()
+
+                logger.info(f"Warte {interval} Sekunden...")
+                await asyncio.sleep(interval)
+            except Exception as e:
+                logger.error(f"Fehler im Hauptloop: {str(e)}")
+                logger.error(traceback.format_exc())
+                await asyncio.sleep(min(interval, 60))
 
 # Diese Funktionen sind für die Integration mit der Web-UI
 def check_github():
