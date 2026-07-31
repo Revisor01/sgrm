@@ -5,6 +5,11 @@ Alle nennenswerten Änderungen an SGRM werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 die Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.1.1] - 2026-07-31
+
+### Sicherheit
+- Dependencies aktualisiert und damit alle offenen Dependabot-Alerts behoben: aiohttp 3.14.1 (u. a. 1× high), werkzeug 3.1.5, requests 2.33.0, markdown 3.8.2
+
 ## [1.1.0] - 2026-07-31
 
 ### Sicherheit
