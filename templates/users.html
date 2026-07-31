@@ -54,6 +54,7 @@
                                         </button>
                                         {% if username != 'admin' %}
                                         <form method="post" action="/users" style="display: inline;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                             <input type="hidden" name="action" value="delete">
                                             <input type="hidden" name="delete_username" value="{{ username }}">
                                             <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Benutzer {{ username }} wirklich löschen?')">
@@ -74,6 +75,7 @@
                 <div class="admin-section-header">Neuer Benutzer</div>
                 <div class="admin-section-body">
                     <form method="post" action="/users">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <input type="hidden" name="action" value="add">
                         <div class="form-row">
                             <div class="form-group">
@@ -101,6 +103,7 @@
         <div class="modal-content">
             <h3>Passwort ändern</h3>
             <form method="post" action="/users">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="action" value="change_password">
                 <input type="hidden" id="password_username" name="password_username">
                 <div class="form-group">
