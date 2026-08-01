@@ -199,7 +199,10 @@ def add_repo():
             repo = f"{parts[0]}/{parts[1]}"
 
         # Validierung: muss owner/repo Format mit gültigen GitHub-Namen haben
-        if re.fullmatch(r'[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?/[A-Za-z0-9._-]+', repo):
+        owner, _, name = repo.partition('/')
+        if (len(repo) <= 255
+                and re.fullmatch(r'[A-Za-z0-9-]+', owner) and not owner.startswith('-')
+                and not owner.endswith('-') and re.fullmatch(r'[A-Za-z0-9._-]+', name)):
             config = load_config()
             if repo not in config['github']['repos']:
                 config['github']['repos'].append(repo)
