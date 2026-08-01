@@ -17,12 +17,15 @@ import markdown
 import nh3
 
 # Konfigurationsdatei
-CONFIG_FILE = "/app/config/config.yaml"
-USERS_FILE = "/app/config/users.json"
-DATA_DIR = "/app/data"
+# Über SGRM_CONFIG_DIR / SGRM_DATA_DIR überschreibbar (z. B. für lokale Tests);
+# die Defaults entsprechen den Volume-Mounts im Container.
+CONFIG_DIR = os.environ.get("SGRM_CONFIG_DIR", "/app/config")
+DATA_DIR = os.environ.get("SGRM_DATA_DIR", "/app/data")
+CONFIG_FILE = f"{CONFIG_DIR}/config.yaml"
+USERS_FILE = f"{CONFIG_DIR}/users.json"
 
 # Stellt sicher, dass die Verzeichnisse existieren
-os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
+os.makedirs(CONFIG_DIR, exist_ok=True)
 os.makedirs(DATA_DIR, exist_ok=True)
 
 # Standardkonfiguration
@@ -43,7 +46,7 @@ DEFAULT_CONFIG = {
 }
 
 # Persistenter Secret Key, damit Sessions einen Container-Neustart überleben
-SECRET_KEY_FILE = os.path.join(os.path.dirname(CONFIG_FILE), "secret_key")
+SECRET_KEY_FILE = os.path.join(CONFIG_DIR, "secret_key")
 
 def get_secret_key():
     try:

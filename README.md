@@ -89,6 +89,20 @@ GET /api/releases/{slug}   # Einzelnes Release (z.B. owner-repo)
 GET /health                # Healthcheck (für Docker/Uptime-Monitoring)
 ```
 
+### Umgebungsvariablen
+
+| Variable | Standard | Beschreibung |
+|----------|----------|--------------|
+| `SGRM_CONFIG_DIR` | `/app/config` | Verzeichnis für `config.yaml`, `users.json` und `secret_key` |
+| `SGRM_DATA_DIR` | `/app/data` | Verzeichnis für `releases.json` und `last_checks.json` |
+
+Im Container müssen beide nicht gesetzt werden — die Standardwerte entsprechen den Volume-Mounts. Für einen lokalen Start ohne Docker:
+
+```bash
+pip install -r requirements.txt
+SGRM_CONFIG_DIR=./config SGRM_DATA_DIR=./data python web_interface.py
+```
+
 ## Deployment
 
 Push auf `main` löst den Workflow [`docker-publish.yml`](.github/workflows/docker-publish.yml) aus: Das Image wird gebaut, als `revisoren/sgrm:latest` (bei Tags zusätzlich mit Versions-Tag) zu Docker Hub gepusht und anschließend per Portainer-Webhook auf dem Zielserver neu ausgerollt.
