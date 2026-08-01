@@ -17,13 +17,16 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Konfigurationsdatei und Datenverzeichnis
-CONFIG_FILE = "/app/config/config.yaml"
-DATA_DIR = "/app/data"
+# Über SGRM_CONFIG_DIR / SGRM_DATA_DIR überschreibbar (z. B. für lokale Tests);
+# die Defaults entsprechen den Volume-Mounts im Container.
+CONFIG_DIR = os.environ.get("SGRM_CONFIG_DIR", "/app/config")
+DATA_DIR = os.environ.get("SGRM_DATA_DIR", "/app/data")
+CONFIG_FILE = f"{CONFIG_DIR}/config.yaml"
 LAST_CHECK_FILE = f"{DATA_DIR}/last_checks.json"
 RELEASES_FILE = f"{DATA_DIR}/releases.json"
 
 # Stellt sicher, dass die Verzeichnisse existieren
-os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
+os.makedirs(CONFIG_DIR, exist_ok=True)
 os.makedirs(DATA_DIR, exist_ok=True)
 
 class ConfigManager:

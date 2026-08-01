@@ -5,6 +5,12 @@ Alle nennenswerten Änderungen an SGRM werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 die Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.2.0] - 2026-08-02
+
+### Hinzugefügt
+- Konfigurations- und Datenverzeichnis sind über `SGRM_CONFIG_DIR` und `SGRM_DATA_DIR` einstellbar. Die Standardwerte (`/app/config`, `/app/data`) entsprechen den bisherigen fest verdrahteten Pfaden — für den Container ändert sich nichts, ein Start außerhalb von Docker ist damit aber ohne Codeänderung möglich
+- README dokumentiert die Umgebungsvariablen und den lokalen Start ohne Docker
+
 ## [1.1.3] - 2026-08-02
 
 ### Sicherheit
