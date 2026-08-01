@@ -5,6 +5,12 @@ Alle nennenswerten Änderungen an SGRM werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 die Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.1.3] - 2026-08-02
+
+### Sicherheit
+- Dependencies aktualisiert: werkzeug 3.1.6 (`safe_join()` ließ Windows-Gerätenamen zu), flask 3.1.3 (fehlender `Vary: Cookie`-Header)
+- Repo-Validierung ohne mehrdeutiges Backtracking umgesetzt, um ReDoS auszuschließen (CodeQL: `py/polynomial-redos`)
+
 ## [1.1.2] - 2026-08-02
 
 ### Sicherheit
