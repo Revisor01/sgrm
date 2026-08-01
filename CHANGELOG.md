@@ -5,6 +5,18 @@ Alle nennenswerten Änderungen an SGRM werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 die Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.1.2] - 2026-08-02
+
+### Sicherheit
+- Repository-Eingabe wird strenger validiert: Owner und Repo müssen dem GitHub-Namensschema entsprechen. Vorher konnten Eingaben wie `evilgithub.com/foo/bar` die URL-Erkennung umgehen und als vermeintliches Repository gespeichert werden (CodeQL: `py/incomplete-url-substring-sanitization`)
+- GitHub-Actions-Workflow auf minimale Berechtigungen (`contents: read`) beschränkt (CodeQL: `actions/missing-workflow-permissions`)
+
+### Hinzugefügt
+- CodeQL Code Scanning und Dependabot Security Updates für das Repository aktiviert
+
+### Geändert
+- README dokumentiert den Deployment-Weg (GitHub Actions → Docker Hub → Portainer-Webhook) inkl. benötigter Secrets
+
 ## [1.1.1] - 2026-07-31
 
 ### Sicherheit
