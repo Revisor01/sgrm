@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+import re
 import json
 import yaml
 from datetime import datetime
@@ -182,12 +183,10 @@ def add_repo():
     repo = request.form.get('repo', '').strip()
     if repo:
         # GitHub URL zu owner/repo konvertieren
-        if repo.startswith('https://github.com/'):
-            repo = repo.replace('https://github.com/', '')
-        elif repo.startswith('http://github.com/'):
-            repo = repo.replace('http://github.com/', '')
-        elif repo.startswith('github.com/'):
-            repo = repo.replace('github.com/', '')
+        for prefix in ('https://github.com/', 'http://github.com/', 'github.com/'):
+            if repo.startswith(prefix):
+                repo = repo[len(prefix):]
+                break
 
         # Trailing slashes und .git entfernen
         repo = repo.rstrip('/')
@@ -199,8 +198,8 @@ def add_repo():
         if len(parts) >= 2:
             repo = f"{parts[0]}/{parts[1]}"
 
-        # Validierung: muss owner/repo Format haben
-        if '/' in repo and len(repo.split('/')) == 2 and all(repo.split('/')):
+        # Validierung: muss owner/repo Format mit gültigen GitHub-Namen haben
+        if re.fullmatch(r'[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?/[A-Za-z0-9._-]+', repo):
             config = load_config()
             if repo not in config['github']['repos']:
                 config['github']['repos'].append(repo)
