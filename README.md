@@ -89,6 +89,12 @@ GET /api/releases/{slug}   # Einzelnes Release (z.B. owner-repo)
 GET /health                # Healthcheck (für Docker/Uptime-Monitoring)
 ```
 
+## Deployment
+
+Push auf `main` löst den Workflow [`docker-publish.yml`](.github/workflows/docker-publish.yml) aus: Das Image wird gebaut, als `revisoren/sgrm:latest` (bei Tags zusätzlich mit Versions-Tag) zu Docker Hub gepusht und anschließend per Portainer-Webhook auf dem Zielserver neu ausgerollt.
+
+Benötigte Repository-Secrets: `DOCKERHUB_TOKEN` (Personal Access Token mit Write-Rechten) und `PORTAINER_WEBHOOK_URL`. Der Docker-Hub-Benutzer ist im Workflow fest hinterlegt.
+
 ## Hinweise
 
 - Beim ersten Check eines neu hinzugefügten Repositories wird nur eine Baseline gesetzt — benachrichtigt wird erst ab dem nächsten neuen Release.
