@@ -2,12 +2,16 @@
 import os
 import re
 import json
+import logging
+import threading
+import time
 import yaml
 from datetime import datetime, timezone
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from flask_wtf.csrf import CSRFProtect
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import LoginManager, UserMixin, login_required, login_user, logout_user, current_user
+from werkzeug.middleware.proxy_fix import ProxyFix
 import secrets
 
 # Import der bestehenden Monitoring-Funktionen
@@ -15,6 +19,8 @@ from monitoring import (check_github, load_last_checks, get_sorted_repos, load_r
                         write_atomic, MIN_CHECK_INTERVAL)
 import markdown
 import nh3
+
+logger = logging.getLogger(__name__)
 
 # Konfigurationsdatei
 # Über SGRM_CONFIG_DIR / SGRM_DATA_DIR überschreibbar (z. B. für lokale Tests);
@@ -45,6 +51,10 @@ DEFAULT_CONFIG = {
     }
 }
 
+# Login-Begrenzung: max. Fehlversuche pro Client-IP innerhalb des Zeitfensters
+LOGIN_MAX_ATTEMPTS = 5
+LOGIN_WINDOW_SECONDS = 15 * 60
+
 # Persistenter Secret Key, damit Sessions einen Container-Neustart überleben
 SECRET_KEY_FILE = os.path.join(CONFIG_DIR, "secret_key")
 
@@ -68,6 +78,11 @@ app.config.update(
     REMEMBER_COOKIE_SAMESITE='Lax',
     REMEMBER_COOKIE_HTTPONLY=True,
 )
+# Hinter einem Reverse Proxy (Traefik, nginx, ...) die Anzahl der Proxies setzen,
+# damit die echte Client-IP (X-Forwarded-For) für die Login-Begrenzung genutzt wird
+trusted_proxies = int(os.environ.get("SGRM_TRUSTED_PROXIES", "0") or 0)
+if trusted_proxies > 0:
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=trusted_proxies, x_proto=trusted_proxies)
 csrf = CSRFProtect(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -101,10 +116,15 @@ def load_users():
         with open(USERS_FILE, 'r') as f:
             return json.load(f)
     except FileNotFoundError:
-        # Erstelle Standard-Admin-Benutzer
+        # Erstelle Standard-Admin-Benutzer (Startpasswort per SGRM_ADMIN_PASSWORD)
+        admin_password = os.environ.get("SGRM_ADMIN_PASSWORD", "")
+        if not admin_password:
+            admin_password = "admin"
+            logger.warning("Admin-Benutzer mit Standardpasswort 'admin' angelegt – bitte ändern "
+                           "oder beim ersten Start SGRM_ADMIN_PASSWORD setzen")
         default_users = {
             "admin": {
-                "password_hash": generate_password_hash("admin"),
+                "password_hash": generate_password_hash(admin_password),
                 "id": "1"
             }
         }
@@ -282,20 +302,57 @@ def users():
     users_data = load_users()
     return render_template('users.html', users=users_data)
 
+# Fehlgeschlagene Logins pro Client-IP (im Speicher; ein Web-Prozess, mehrere Threads)
+_failed_logins = {}
+_failed_logins_lock = threading.Lock()
+
+def _login_blocked_for(ip):
+    """Gibt die verbleibende Sperrzeit in Sekunden zurück (0 = nicht gesperrt)"""
+    now = time.monotonic()
+    with _failed_logins_lock:
+        attempts = [t for t in _failed_logins.get(ip, []) if now - t < LOGIN_WINDOW_SECONDS]
+        if attempts:
+            _failed_logins[ip] = attempts
+        else:
+            _failed_logins.pop(ip, None)
+        if len(attempts) >= LOGIN_MAX_ATTEMPTS:
+            return int(LOGIN_WINDOW_SECONDS - (now - attempts[0])) + 1
+        return 0
+
+def _record_failed_login(ip):
+    now = time.monotonic()
+    with _failed_logins_lock:
+        # Speicher begrenzen: abgelaufene Einträge anderer IPs gelegentlich aufräumen
+        if len(_failed_logins) > 1000:
+            for key in [k for k, v in _failed_logins.items() if now - v[-1] >= LOGIN_WINDOW_SECONDS]:
+                del _failed_logins[key]
+        _failed_logins.setdefault(ip, []).append(now)
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
+        ip = request.remote_addr or 'unknown'
+        blocked_for = _login_blocked_for(ip)
+        if blocked_for:
+            logger.warning(f"Login für {ip} gesperrt (zu viele Fehlversuche)")
+            flash(f'Zu viele Fehlversuche. Bitte in {(blocked_for + 59) // 60} Minute(n) erneut versuchen.', 'danger')
+            return render_template('login.html'), 429
+
         username = request.form.get('username')
-        password = request.form.get('password')
-        
+        password = request.form.get('password') or ''
+
         users_data = load_users()
         if username in users_data and check_password_hash(users_data[username]['password_hash'], password):
+            with _failed_logins_lock:
+                _failed_logins.pop(ip, None)
             user = User(users_data[username]['id'], username, users_data[username]['password_hash'])
             login_user(user)
             return redirect(url_for('index'))
         else:
+            _record_failed_login(ip)
+            logger.warning(f"Fehlgeschlagener Login für Benutzer {username!r} von {ip}")
             flash('Falsche Anmeldedaten!', 'danger')
-    
+
     return render_template('login.html')
 
 @app.route('/logout')

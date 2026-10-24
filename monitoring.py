@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-import requests
+import contextlib
+import fcntl
 import json
 import os
 import logging
@@ -25,6 +26,7 @@ DATA_DIR = os.environ.get("SGRM_DATA_DIR", "/app/data")
 CONFIG_FILE = f"{CONFIG_DIR}/config.yaml"
 LAST_CHECK_FILE = f"{DATA_DIR}/last_checks.json"
 RELEASES_FILE = f"{DATA_DIR}/releases.json"
+LOCK_FILE = f"{DATA_DIR}/.check.lock"
 
 # Stellt sicher, dass die Verzeichnisse existieren
 os.makedirs(CONFIG_DIR, exist_ok=True)
@@ -49,6 +51,18 @@ def write_atomic(path, write_fn):
 
 def write_json_atomic(path, data):
     write_atomic(path, lambda f: json.dump(data, f, indent=2))
+
+@contextlib.contextmanager
+def data_lock():
+    """Prozessübergreifende Sperre (flock) für Checks und Änderungen an den
+    Daten-Dateien. Verhindert, dass ein manueller Check aus der Web-UI parallel
+    zum regulären Durchlauf läuft und dasselbe Release doppelt meldet."""
+    with open(LOCK_FILE, 'w') as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(f, fcntl.LOCK_UN)
 
 class ConfigManager:
     """Verwaltet die Konfiguration des Monitoring-Services"""
@@ -96,6 +110,14 @@ class DataManager:
             logger.error(f"Fehler beim Speichern der Checks: {e}")
 
     @staticmethod
+    def set_last_check(repo, published_at):
+        """Setzt den Zeitstempel eines Repos. Lädt die Datei dafür frisch, damit
+        parallel laufende Repo-Checks sich nicht gegenseitig überschreiben."""
+        last_checks = DataManager.load_last_checks()
+        last_checks.setdefault('github', {})[repo] = published_at
+        DataManager.save_last_checks(last_checks)
+
+    @staticmethod
     def load_releases():
         """Lädt die gespeicherten Release-Daten"""
         try:
@@ -119,15 +141,16 @@ class DataManager:
     def remove_repo_data(repo):
         """Entfernt gespeicherte Daten eines Repositories (Release + letzter Check)"""
         try:
-            releases = DataManager.load_releases()
-            if repo in releases:
-                del releases[repo]
-                write_json_atomic(RELEASES_FILE, releases)
+            with data_lock():
+                releases = DataManager.load_releases()
+                if repo in releases:
+                    del releases[repo]
+                    write_json_atomic(RELEASES_FILE, releases)
 
-            last_checks = DataManager.load_last_checks()
-            if repo in last_checks.get('github', {}):
-                del last_checks['github'][repo]
-                DataManager.save_last_checks(last_checks)
+                last_checks = DataManager.load_last_checks()
+                if repo in last_checks.get('github', {}):
+                    del last_checks['github'][repo]
+                    DataManager.save_last_checks(last_checks)
 
             logger.info(f"Daten für {repo} entfernt")
         except Exception as e:
@@ -141,38 +164,41 @@ class NotificationService:
         self.ntfy_token = config.get('ntfy', {}).get('token', '')
         self.ntfy_base_url = config.get('ntfy', {}).get('base_url', 'https://ntfy.sh').rstrip('/')
 
-    def send_ntfy(self, topic, title, message, tags=None, priority="default", extra_headers=None):
-        """Sendet eine Benachrichtigung über ntfy.sh"""
+    async def send_ntfy(self, session, topic, title, message, tags=None, click=None, icon=None):
+        """Sendet eine Benachrichtigung über ntfy (JSON-API, damit Umlaute in
+        Titel/Tags kein Header-Encoding brauchen)"""
         try:
             logger.info(f"Sende ntfy Nachricht an Topic {topic}")
             logger.debug(f"Title: {title}")
             logger.debug(f"Message: {message}")
 
-            headers = {
-                "Title": title.encode('utf-8'),
-                "Tags": (tags or "").encode('utf-8'),
-                "Priority": priority,
-                "Markdown": "true"
+            payload = {
+                "topic": topic,
+                "title": title,
+                "message": message,
+                "markdown": True
             }
+            if tags:
+                payload["tags"] = tags
+            if click:
+                payload["click"] = click
+            if icon:
+                payload["icon"] = icon
+
+            headers = {}
             if self.ntfy_token:
                 headers["Authorization"] = f"Bearer {self.ntfy_token}"
 
-            if extra_headers:
-                headers.update({k: v.encode('utf-8') if isinstance(v, str) else v
-                             for k, v in extra_headers.items()})
-
-            response = requests.post(
-                f"{self.ntfy_base_url}/{topic}",
+            async with session.post(
+                self.ntfy_base_url,
+                json=payload,
                 headers=headers,
-                data=message.encode('utf-8'),
-                timeout=15
-            )
-            
-            logger.info(f"ntfy Response Status: {response.status_code}")
-            if response.status_code != 200:
-                logger.error(f"ntfy Error Response: {response.text}")
-                
-            return response.status_code
+                timeout=aiohttp.ClientTimeout(total=15)
+            ) as response:
+                logger.info(f"ntfy Response Status: {response.status}")
+                if response.status != 200:
+                    logger.error(f"ntfy Error Response: {await response.text()}")
+                return response.status
         except Exception as e:
             logger.error(f"Fehler beim Senden der ntfy Nachricht: {str(e)}")
             logger.error(traceback.format_exc())
@@ -250,15 +276,13 @@ class GitHubMonitor:
                 DataManager.save_release(repo, release_data)
 
                 # Prüfen, ob das Release neu ist
-                last_checks = DataManager.load_last_checks()
-                last_check = last_checks['github'].get(repo)
+                last_check = DataManager.load_last_checks().get('github', {}).get(repo)
                 logger.info(f"Letzter Check für {repo}: {last_check}")
 
                 if last_check is None:
                     # Erster Check für dieses Repo: Baseline setzen, nicht benachrichtigen
                     logger.info(f"Erster Check für {repo}, Baseline: {tag_name} (keine Benachrichtigung)")
-                    last_checks['github'][repo] = published_at
-                    DataManager.save_last_checks(last_checks)
+                    DataManager.set_last_check(repo, published_at)
                     return False
                 elif published_at != last_check:
                     logger.info(f"Neues Release gefunden für {repo}: {tag_name}")
@@ -278,23 +302,21 @@ class GitHubMonitor:
 
 [Details ansehen]({release_url})"""
 
-                    status_code = self.notification_service.send_ntfy(
+                    status_code = await self.notification_service.send_ntfy(
+                        session,
                         self.ntfy_topic,
                         f"Neues Release: {repo}",
                         message,
-                        "github,release",
-                        extra_headers={
-                            "Click": release_url,
-                            "Icon": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png"
-                        }
+                        tags=["github", "release"],
+                        click=release_url,
+                        icon="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png"
                     )
                     logger.info(f"GitHub Release Benachrichtigung gesendet für {repo}, Status: {status_code}")
 
                     # Zeitstempel nur bei erfolgreicher Zustellung fortschreiben,
                     # sonst wird die Benachrichtigung im nächsten Zyklus erneut versucht
                     if status_code == 200:
-                        last_checks['github'][repo] = published_at
-                        DataManager.save_last_checks(last_checks)
+                        DataManager.set_last_check(repo, published_at)
                     else:
                         logger.warning(f"Benachrichtigung für {repo} fehlgeschlagen, neuer Versuch im nächsten Zyklus")
                     return True
@@ -311,11 +333,15 @@ class GitHubMonitor:
         """Prüft alle konfigurierten Repositories auf neue Releases"""
         logger.info("Starte GitHub Release Check")
 
-        # Parallele Anfragen für alle Repositories
-        timeout = aiohttp.ClientTimeout(total=30)
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            tasks = [self.check_repo(session, repo) for repo in self.repos]
-            await asyncio.gather(*tasks)
+        # Sperre über den gesamten Durchlauf; ein zweiter Check (Web-UI bzw.
+        # Monitoring-Loop) wartet, bis der laufende fertig ist. Das Blockieren
+        # ist unkritisch, da in diesem Event-Loop sonst nichts läuft.
+        with data_lock():
+            # Parallele Anfragen für alle Repositories
+            timeout = aiohttp.ClientTimeout(total=30)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                tasks = [self.check_repo(session, repo) for repo in self.repos]
+                await asyncio.gather(*tasks)
 
         logger.info("GitHub-Check abgeschlossen")
 

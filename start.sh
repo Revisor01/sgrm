@@ -1,6 +1,14 @@
 #!/bin/bash
 set -e
 
+# Als root gestartet: Config-/Data-Verzeichnisse (auch bestehende Volumes aus
+# Versionen, die noch als root liefen) dem App-Benutzer übergeben und das
+# Skript ohne root-Rechte neu starten.
+if [ "$(id -u)" = "0" ]; then
+    chown -R sgrm:sgrm "${SGRM_CONFIG_DIR:-/app/config}" "${SGRM_DATA_DIR:-/app/data}"
+    exec setpriv --reuid=sgrm --regid=sgrm --init-groups "$0" "$@"
+fi
+
 echo "Starte Web-Interface..."
 python web_interface.py &
 
