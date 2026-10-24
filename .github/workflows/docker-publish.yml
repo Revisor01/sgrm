@@ -87,8 +87,8 @@ jobs:
           curl -fsS http://localhost:8080/api/releases
 
           # Keine Anwendungsprozesse als root, Dateien gehören dem App-Benutzer
-          docker top sgrm-smoke -eo uid,args
-          if docker top sgrm-smoke -eo uid,args | awk 'NR > 1 && $1 == 0' | grep -q .; then
+          docker top sgrm-smoke -eo pid,uid,args
+          if docker top sgrm-smoke -eo pid,uid,args | awk 'NR > 1 && $2 == 0' | grep -q .; then
             echo "::error::Prozesse laufen als root"
             exit 1
           fi
