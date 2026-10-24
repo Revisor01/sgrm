@@ -29,15 +29,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set custom tag if provided
         if: github.event_name == 'workflow_dispatch' && inputs.image_tag != ''
-        run: echo "CUSTOM_TAG=${{ inputs.image_tag }}" >> $GITHUB_ENV
+        env:
+          IMAGE_TAG_INPUT: ${{ inputs.image_tag }}
+        run: |
+          # Nur gültige Docker-Tag-Zeichen zulassen
+          if [[ ! "$IMAGE_TAG_INPUT" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]]; then
+            echo "::error::Ungültiges Image-Tag: $IMAGE_TAG_INPUT"
+            exit 1
+          fi
+          echo "CUSTOM_TAG=$IMAGE_TAG_INPUT" >> "$GITHUB_ENV"
 
       - name: Set Docker tags
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: revisoren/sgrm
           tags: |
@@ -47,16 +55,63 @@ jobs:
             type=raw,value=${{ env.CUSTOM_TAG }},enable=${{ env.CUSTOM_TAG != '' }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
+      # Image lokal bauen und starten, bevor irgendetwas gepusht wird
+      - name: Build image for smoke test
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./Dockerfile
+          load: true
+          tags: sgrm:smoke
+          cache-from: type=gha
+
+      - name: Smoke test
+        run: |
+          # Volumes wie aus Versionen, die noch als root liefen
+          mkdir -p smoke/config smoke/data
+          echo '{}' | sudo tee smoke/data/releases.json > /dev/null
+          sudo chown -R root:root smoke
+
+          docker run -d --name sgrm-smoke -p 8080:8080 \
+            -e SGRM_ADMIN_PASSWORD=smoke-test \
+            -v "$PWD/smoke/config:/app/config" -v "$PWD/smoke/data:/app/data" sgrm:smoke
+
+          for i in $(seq 1 30); do
+            curl -fsS http://localhost:8080/health && break
+            sleep 1
+          done
+          curl -fsS http://localhost:8080/health
+          curl -fsS http://localhost:8080/releases > /dev/null
+          curl -fsS http://localhost:8080/api/releases
+
+          # Keine Anwendungsprozesse als root, Dateien gehören dem App-Benutzer
+          docker top sgrm-smoke -eo pid,uid,args
+          if docker top sgrm-smoke -eo pid,uid,args | awk 'NR > 1 && $2 == 0' | grep -q .; then
+            echo "::error::Prozesse laufen als root"
+            exit 1
+          fi
+          test "$(sudo stat -c %u smoke/config/config.yaml)" = 1000
+          test "$(sudo stat -c %u smoke/data/releases.json)" = 1000
+
+          # docker stop muss ohne 10-s-Timeout (SIGKILL) durchgehen
+          start=$(date +%s)
+          docker stop sgrm-smoke
+          test $(( $(date +%s) - start )) -lt 8
+          docker logs sgrm-smoke
+
+      # PRs (z. B. von Dependabot) haben keinen Zugriff auf Secrets und
+      # pushen ohnehin nicht – dort nur bauen.
       - name: Login to Docker Hub
-        uses: docker/login-action@v3
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v4
         with:
           username: revisoren
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push to Docker Hub
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ./Dockerfile
@@ -65,19 +120,17 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          
+
       - name: Push to Portainer
         if: github.event_name != 'pull_request' && (github.event_name != 'workflow_dispatch' || inputs.deploy_to_portainer)
+        env:
+          PORTAINER_WEBHOOK_URL: ${{ secrets.PORTAINER_WEBHOOK_URL }}
         run: |
           # Bestimme das Tag für den Portainer-Webhook
-          if [[ -n "${{ env.CUSTOM_TAG }}" ]]; then
-            IMAGE_TAG="${{ env.CUSTOM_TAG }}"
-          else
-            IMAGE_TAG="latest"
-          fi
-          
-          # Rufe den Portainer-Webhook auf
-          curl -X POST ${{ secrets.PORTAINER_WEBHOOK_URL }} -H "Content-Type: application/json" \
+          IMAGE_TAG="${CUSTOM_TAG:-latest}"
+
+          # Rufe den Portainer-Webhook auf (-f: HTTP-Fehler lassen den Job fehlschlagen)
+          curl -fsS -X POST "$PORTAINER_WEBHOOK_URL" -H "Content-Type: application/json" \
             -d "{\"repository\":\"revisoren/sgrm:${IMAGE_TAG}\"}"
 
           echo "Deployed revisoren/sgrm:${IMAGE_TAG} to Portainer"

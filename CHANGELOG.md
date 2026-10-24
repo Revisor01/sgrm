@@ -5,6 +5,36 @@ Alle nennenswerten Änderungen an SGRM werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 die Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.3.0] - 2026-10-24
+
+### Hinzugefügt
+- `SGRM_ADMIN_PASSWORD`: Startpasswort des Admin-Benutzers beim ersten Start (sonst weiterhin `admin`, mit Warnung im Log)
+- Login-Begrenzung: max. 5 Fehlversuche pro Client-IP in 15 Minuten, danach HTTP 429; fehlgeschlagene Logins werden geloggt
+- `SGRM_TRUSTED_PROXIES` für den Betrieb hinter Reverse Proxies (echte Client-IP via `X-Forwarded-For`)
+- CI: Smoke-Test startet das gebaute Image vor dem Push (Healthcheck, öffentliche Seiten, Nicht-root-Prozesse, Übernahme root-eigener Volumes, schnelles `docker stop`)
+
+### Sicherheit
+- Container-Prozesse laufen nicht mehr als root, sondern als Benutzer `sgrm` (UID 1000). `start.sh` übernimmt bestehende Volumes per `chown` und wechselt dann per `setpriv` den Benutzer
+- Dependencies aktualisiert (offene Dependabot-PRs #4 und #5): werkzeug 3.1.9, aiohttp 3.14.5, außerdem flask-wtf 1.3.0, pyyaml 6.0.3, markdown 3.11.2, nh3 0.3.7
+- Workflow: `image_tag`-Eingabe und Portainer-Webhook-URL werden über Umgebungsvariablen statt per Template-Interpolation an das Shell-Skript übergeben (Script-Injection), das Tag wird validiert
+- Session-Cookies mit `SameSite=Lax`
+
+### Behoben
+- Releases ohne Beschreibung (`body: null` von der GitHub-API) führten zu einem Fehler, nachdem der Zeitstempel bereits gespeichert war — die Benachrichtigung ging dadurch verloren. Gleiches gilt für fehlenden `name`/`author`
+- Schlägt der ntfy-Versand fehl, wird der Zeitstempel nicht fortgeschrieben, sodass die Benachrichtigung im nächsten Zyklus erneut versucht wird
+- Prüfintervall wird auf mindestens 60 Sekunden begrenzt (vorher führte `0` zu einer Endlosschleife gegen die GitHub-API)
+- Konfigurations- und Datendateien werden atomar geschrieben — Web-UI und Monitoring-Prozess können keine halb geschriebenen Dateien mehr lesen
+- Ein manueller Check aus der Web-UI konnte parallel zum regulären Durchlauf laufen und dasselbe Release doppelt melden. Checks und das Entfernen von Repos laufen jetzt unter einer gemeinsamen Dateisperre
+- `docker stop` beendet den Container sofort sauber (SIGTERM wird an beide Prozesse weitergereicht) statt nach 10 s per SIGKILL
+- CI-Build für Dependabot-PRs schlug fehl, weil der Docker-Hub-Login ohne Secrets lief — Login läuft jetzt nur, wenn auch gepusht wird
+
+### Geändert
+- Basis-Image `python:3.13-slim` (vorher 3.11)
+- GitHub Actions auf aktuelle Major-Versionen (Node 24) aktualisiert
+- Dependabot-Versionsupdates für pip, GitHub Actions und Docker (monatlich, gebündelt) über `.github/dependabot.yml`
+- Abhängigkeit `pytz` entfernt (ersetzt durch `datetime.timezone`)
+- Abhängigkeit `requests` entfernt: ntfy-Benachrichtigungen laufen über `aiohttp` und die ntfy-JSON-API (Umlaute in Titel/Tags ohne Header-Encoding, blockiert den Event-Loop nicht mehr)
+
 ## [1.2.0] - 2026-08-02
 
 ### Hinzugefügt

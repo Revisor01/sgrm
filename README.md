@@ -42,7 +42,7 @@ docker run -d \
   revisoren/sgrm
 ```
 
-Öffne http://localhost:8080 und melde dich mit `admin` / `admin` an.
+Öffne http://localhost:8080 und melde dich mit `admin` / `admin` an — oder setze beim ersten Start `-e SGRM_ADMIN_PASSWORD=...`, dann gilt dieses Passwort.
 
 ### Docker Compose
 
@@ -95,6 +95,8 @@ GET /health                # Healthcheck (für Docker/Uptime-Monitoring)
 |----------|----------|--------------|
 | `SGRM_CONFIG_DIR` | `/app/config` | Verzeichnis für `config.yaml`, `users.json` und `secret_key` |
 | `SGRM_DATA_DIR` | `/app/data` | Verzeichnis für `releases.json` und `last_checks.json` |
+| `SGRM_ADMIN_PASSWORD` | `admin` | Startpasswort des Admin-Benutzers. Wirkt nur beim ersten Start (solange noch keine `users.json` existiert) |
+| `SGRM_TRUSTED_PROXIES` | `0` | Anzahl vorgeschalteter Reverse Proxies (z. B. `1` hinter Traefik/nginx). Nötig, damit die Login-Begrenzung die echte Client-IP aus `X-Forwarded-For` nutzt — sonst teilen sich alle Clients die IP des Proxys |
 
 Im Container müssen beide nicht gesetzt werden — die Standardwerte entsprechen den Volume-Mounts. Für einen lokalen Start ohne Docker:
 
@@ -114,6 +116,8 @@ Benötigte Repository-Secrets: `DOCKERHUB_TOKEN` (Personal Access Token mit Writ
 - Beim ersten Check eines neu hinzugefügten Repositories wird nur eine Baseline gesetzt — benachrichtigt wird erst ab dem nächsten neuen Release.
 - Konfigurationsänderungen (Repos, Intervall, Token) wirken ohne Neustart ab dem nächsten Prüfzyklus.
 - Release-Notes werden serverseitig sanitisiert (XSS-Schutz auf den öffentlichen Seiten).
+- Login: nach 5 Fehlversuchen innerhalb von 15 Minuten wird die Client-IP für den Rest des Zeitfensters gesperrt.
+- Die Anwendung läuft im Container als Benutzer `sgrm` (UID 1000). Beim Start übernimmt sie die Config-/Data-Verzeichnisse per `chown`, bestehende Volumes funktionieren also ohne manuellen Eingriff.
 
 ## Lizenz
 
