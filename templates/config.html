@@ -103,7 +103,7 @@
                     <div class="admin-section-body">
                         <div class="form-group">
                             <label for="check_interval">Intervall (Sekunden)</label>
-                            <input type="number" id="check_interval" name="check_interval" value="{{ config.general.check_interval }}">
+                            <input type="number" id="check_interval" name="check_interval" min="60" value="{{ config.general.check_interval }}">
                         </div>
                         <div class="form-group">
                             <label for="base_url">Base URL</label>

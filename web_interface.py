@@ -3,8 +3,7 @@ import os
 import re
 import json
 import yaml
-from datetime import datetime
-import pytz
+from datetime import datetime, timezone
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from flask_wtf.csrf import CSRFProtect
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -12,7 +11,8 @@ from flask_login import LoginManager, UserMixin, login_required, login_user, log
 import secrets
 
 # Import der bestehenden Monitoring-Funktionen
-from monitoring import check_github, load_last_checks, get_sorted_repos, load_releases, DataManager
+from monitoring import (check_github, load_last_checks, get_sorted_repos, load_releases, DataManager,
+                        write_atomic, MIN_CHECK_INTERVAL)
 import markdown
 import nh3
 
@@ -57,14 +57,17 @@ def get_secret_key():
     except FileNotFoundError:
         pass
     key = secrets.token_hex(32)
-    with open(SECRET_KEY_FILE, 'w') as f:
-        f.write(key)
-    os.chmod(SECRET_KEY_FILE, 0o600)
+    write_atomic(SECRET_KEY_FILE, lambda f: f.write(key))
     return key
 
 # Flask App initialisieren
 app = Flask(__name__)
 app.secret_key = get_secret_key()
+app.config.update(
+    SESSION_COOKIE_SAMESITE='Lax',
+    REMEMBER_COOKIE_SAMESITE='Lax',
+    REMEMBER_COOKIE_HTTPONLY=True,
+)
 csrf = CSRFProtect(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -85,14 +88,12 @@ def load_config():
             return config
     except FileNotFoundError:
         # Erstelle Standardkonfiguration, wenn keine existiert
-        with open(CONFIG_FILE, 'w') as f:
-            yaml.dump(DEFAULT_CONFIG, f)
+        save_config(DEFAULT_CONFIG)
         return DEFAULT_CONFIG
 
 # Speichere Konfiguration
 def save_config(config):
-    with open(CONFIG_FILE, 'w') as f:
-        yaml.dump(config, f)
+    write_atomic(CONFIG_FILE, lambda f: yaml.dump(config, f))
 
 # Lade oder erstelle Benutzer
 def load_users():
@@ -107,14 +108,12 @@ def load_users():
                 "id": "1"
             }
         }
-        with open(USERS_FILE, 'w') as f:
-            json.dump(default_users, f)
+        save_users(default_users)
         return default_users
 
 # Speichere Benutzer
 def save_users(users):
-    with open(USERS_FILE, 'w') as f:
-        json.dump(users, f)
+    write_atomic(USERS_FILE, lambda f: json.dump(users, f))
 
 # Benutzer-Loader für Flask-Login
 @login_manager.user_loader
@@ -167,9 +166,10 @@ def config():
 
         # Allgemeine Konfiguration
         try:
-            config['general']['check_interval'] = int(request.form.get('check_interval', 3600))
+            check_interval = int(request.form.get('check_interval', 3600))
         except ValueError:
-            config['general']['check_interval'] = 3600
+            check_interval = 3600
+        config['general']['check_interval'] = max(check_interval, MIN_CHECK_INTERVAL)
         config['general']['base_url'] = request.form.get('base_url', '').rstrip('/')
 
         # Konfiguration speichern
@@ -327,7 +327,7 @@ def format_relative_time(iso_timestamp):
     """Formatiert einen ISO-Timestamp als relative Zeit"""
     try:
         dt = datetime.fromisoformat(iso_timestamp.replace('Z', '+00:00'))
-        now = datetime.now(pytz.UTC)
+        now = datetime.now(timezone.utc)
         diff = now - dt
 
         if diff.days > 365:
@@ -346,7 +346,7 @@ def format_relative_time(iso_timestamp):
             return f"vor {minutes} Minute{'n' if minutes > 1 else ''}"
         else:
             return "gerade eben"
-    except:
+    except (AttributeError, TypeError, ValueError):
         return iso_timestamp
 
 def render_markdown(text):

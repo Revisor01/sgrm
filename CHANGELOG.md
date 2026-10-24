@@ -5,6 +5,27 @@ Alle nennenswerten Änderungen an SGRM werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 die Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.2.1] - 2026-10-24
+
+### Sicherheit
+- Dependencies aktualisiert (offene Dependabot-PRs #4 und #5): werkzeug 3.1.9, aiohttp 3.14.5, außerdem flask-wtf 1.3.0, requests 2.34.2, pyyaml 6.0.3, markdown 3.11.2, nh3 0.3.7
+- Workflow: `image_tag`-Eingabe und Portainer-Webhook-URL werden über Umgebungsvariablen statt per Template-Interpolation an das Shell-Skript übergeben (Script-Injection), das Tag wird validiert
+- Session-Cookies mit `SameSite=Lax`
+
+### Behoben
+- Releases ohne Beschreibung (`body: null` von der GitHub-API) führten zu einem Fehler, nachdem der Zeitstempel bereits gespeichert war — die Benachrichtigung ging dadurch verloren. Gleiches gilt für fehlenden `name`/`author`
+- Schlägt der ntfy-Versand fehl, wird der Zeitstempel nicht fortgeschrieben, sodass die Benachrichtigung im nächsten Zyklus erneut versucht wird
+- Prüfintervall wird auf mindestens 60 Sekunden begrenzt (vorher führte `0` zu einer Endlosschleife gegen die GitHub-API)
+- Konfigurations- und Datendateien werden atomar geschrieben — Web-UI und Monitoring-Prozess können keine halb geschriebenen Dateien mehr lesen
+- `docker stop` beendet den Container sofort sauber (SIGTERM wird an beide Prozesse weitergereicht) statt nach 10 s per SIGKILL
+- CI-Build für Dependabot-PRs schlug fehl, weil der Docker-Hub-Login ohne Secrets lief — Login läuft jetzt nur, wenn auch gepusht wird
+
+### Geändert
+- Basis-Image `python:3.13-slim` (vorher 3.11)
+- GitHub Actions auf aktuelle Major-Versionen (Node 24) aktualisiert
+- Dependabot-Versionsupdates für pip, GitHub Actions und Docker (monatlich, gebündelt) über `.github/dependabot.yml`
+- Abhängigkeit `pytz` entfernt (ersetzt durch `datetime.timezone`)
+
 ## [1.2.0] - 2026-08-02
 
 ### Hinzugefügt

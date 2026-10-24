@@ -3,6 +3,7 @@ import requests
 import json
 import os
 import logging
+import tempfile
 from datetime import datetime
 import traceback
 import yaml
@@ -28,6 +29,26 @@ RELEASES_FILE = f"{DATA_DIR}/releases.json"
 # Stellt sicher, dass die Verzeichnisse existieren
 os.makedirs(CONFIG_DIR, exist_ok=True)
 os.makedirs(DATA_DIR, exist_ok=True)
+
+# Untergrenze für das Prüfintervall, damit ein versehentlich zu kleiner Wert
+# (z. B. 0) nicht in einer Endlosschleife die GitHub-API flutet
+MIN_CHECK_INTERVAL = 60
+
+def write_atomic(path, write_fn):
+    """Schreibt eine Datei atomar (Temp-Datei + rename), damit Web-UI und
+    Monitoring nie eine halb geschriebene Datei lesen. Die Datei erhält wie
+    bei mkstemp üblich die Rechte 0600 (enthält teils Tokens/Hashes)."""
+    fd, tmp_path = tempfile.mkstemp(dir=os.path.dirname(path), suffix='.tmp')
+    try:
+        with os.fdopen(fd, 'w') as f:
+            write_fn(f)
+        os.replace(tmp_path, path)
+    except BaseException:
+        os.unlink(tmp_path)
+        raise
+
+def write_json_atomic(path, data):
+    write_atomic(path, lambda f: json.dump(data, f, indent=2))
 
 class ConfigManager:
     """Verwaltet die Konfiguration des Monitoring-Services"""
@@ -60,7 +81,7 @@ class DataManager:
                 data = json.load(f)
                 logger.info("Letzte Checks erfolgreich geladen")
                 return data
-        except:
+        except (OSError, ValueError):
             logger.info("Keine vorherigen Checks gefunden, erstelle neue Datei")
             return {'github': {}}
 
@@ -69,9 +90,8 @@ class DataManager:
         """Speichert die letzten Prüfzeitpunkte"""
         try:
             logger.info(f"Speichere Checks in {LAST_CHECK_FILE}")
-            with open(LAST_CHECK_FILE, 'w') as f:
-                json.dump(data, f, indent=2)
-                logger.info("Checks erfolgreich gespeichert")
+            write_json_atomic(LAST_CHECK_FILE, data)
+            logger.info("Checks erfolgreich gespeichert")
         except Exception as e:
             logger.error(f"Fehler beim Speichern der Checks: {e}")
 
@@ -81,7 +101,7 @@ class DataManager:
         try:
             with open(RELEASES_FILE, 'r') as f:
                 return json.load(f)
-        except:
+        except (OSError, ValueError):
             return {}
 
     @staticmethod
@@ -90,8 +110,7 @@ class DataManager:
         try:
             releases = DataManager.load_releases()
             releases[repo] = release_data
-            with open(RELEASES_FILE, 'w') as f:
-                json.dump(releases, f, indent=2)
+            write_json_atomic(RELEASES_FILE, releases)
             logger.info(f"Release-Daten für {repo} gespeichert")
         except Exception as e:
             logger.error(f"Fehler beim Speichern der Release-Daten: {e}")
@@ -103,8 +122,7 @@ class DataManager:
             releases = DataManager.load_releases()
             if repo in releases:
                 del releases[repo]
-                with open(RELEASES_FILE, 'w') as f:
-                    json.dump(releases, f, indent=2)
+                write_json_atomic(RELEASES_FILE, releases)
 
             last_checks = DataManager.load_last_checks()
             if repo in last_checks.get('github', {}):
@@ -205,17 +223,20 @@ class GitHubMonitor:
                 release = await response.json()
                 published_at = release['published_at']
                 tag_name = release['tag_name']
+                # GitHub liefert body, name und author teils als null
+                body = release.get('body') or ''
+                author = release.get('author') or {}
                 logger.info(f"Letztes Release für {repo}: {tag_name} vom {published_at}")
 
                 # Release-Daten für API speichern
                 release_data = {
                     'tag_name': tag_name,
-                    'name': release.get('name', tag_name),
-                    'body': release.get('body', ''),
+                    'name': release.get('name') or tag_name,
+                    'body': body,
                     'published_at': published_at,
                     'html_url': release['html_url'],
-                    'author': release.get('author', {}).get('login', 'unknown'),
-                    'author_avatar': release.get('author', {}).get('avatar_url', ''),
+                    'author': author.get('login', 'unknown'),
+                    'author_avatar': author.get('avatar_url', ''),
                     'assets': [
                         {
                             'name': asset['name'],
@@ -233,13 +254,11 @@ class GitHubMonitor:
                 last_check = last_checks['github'].get(repo)
                 logger.info(f"Letzter Check für {repo}: {last_check}")
 
-                # Immer den Zeitstempel aktualisieren
-                last_checks['github'][repo] = published_at
-                DataManager.save_last_checks(last_checks)
-
                 if last_check is None:
                     # Erster Check für dieses Repo: Baseline setzen, nicht benachrichtigen
                     logger.info(f"Erster Check für {repo}, Baseline: {tag_name} (keine Benachrichtigung)")
+                    last_checks['github'][repo] = published_at
+                    DataManager.save_last_checks(last_checks)
                     return False
                 elif published_at != last_check:
                     logger.info(f"Neues Release gefunden für {repo}: {tag_name}")
@@ -249,8 +268,8 @@ class GitHubMonitor:
                     release_url = f"{self.base_url}/releases/{repo_slug}" if self.base_url else release['html_url']
 
                     # Kurze Beschreibung für Push
-                    body_preview = release.get('body', '')[:200]
-                    if len(release.get('body', '')) > 200:
+                    body_preview = body[:200]
+                    if len(body) > 200:
                         body_preview += '...'
 
                     message = f"""**{tag_name}** veröffentlicht!
@@ -270,6 +289,14 @@ class GitHubMonitor:
                         }
                     )
                     logger.info(f"GitHub Release Benachrichtigung gesendet für {repo}, Status: {status_code}")
+
+                    # Zeitstempel nur bei erfolgreicher Zustellung fortschreiben,
+                    # sonst wird die Benachrichtigung im nächsten Zyklus erneut versucht
+                    if status_code == 200:
+                        last_checks['github'][repo] = published_at
+                        DataManager.save_last_checks(last_checks)
+                    else:
+                        logger.warning(f"Benachrichtigung für {repo} fehlgeschlagen, neuer Versuch im nächsten Zyklus")
                     return True
                 else:
                     logger.info(f"Kein neues Release für {repo}")
@@ -309,7 +336,7 @@ class MonitoringService:
                     await asyncio.sleep(30)
                     continue
 
-                interval = config.get('general', {}).get('check_interval', 3600)
+                interval = max(int(config.get('general', {}).get('check_interval', 3600)), MIN_CHECK_INTERVAL)
                 notification_service = NotificationService(config)
                 github_monitor = GitHubMonitor(config, notification_service)
                 await github_monitor.check()
