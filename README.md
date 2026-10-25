@@ -6,32 +6,31 @@
 
 <p align="center">
   <img src="https://img.shields.io/github/actions/workflow/status/Revisor01/sgrm/docker-publish.yml?logo=github" alt="Build">
-  <img src="https://img.shields.io/badge/Python-3.11+-blue?logo=python" alt="Python">
+  <img src="https://img.shields.io/badge/Python-3.13-blue?logo=python" alt="Python">
   <img src="https://img.shields.io/badge/Docker-ready-blue?logo=docker" alt="Docker">
   <img src="https://img.shields.io/github/license/Revisor01/sgrm" alt="License">
   <img src="https://img.shields.io/github/v/release/Revisor01/sgrm" alt="Version">
 </p>
 
-<p align="center">
-  <a href="https://sgrm.godsapp.de/releases">Demo</a> •
-  <a href="#features">Features</a> •
-  <a href="#schnellstart">Schnellstart</a> •
-  <a href="#konfiguration">Konfiguration</a> •
-  <a href="#api">API</a>
-</p>
+## Worum es geht
 
----
+Wer Software selbst betreibt, will wissen, wann es eine neue Version gibt —
+für viele Projekte auf GitHub, ohne jedes einzeln zu beobachten. SGRM prüft
+die eingetragenen Repositories in festen Abständen, schickt bei einem neuen
+Release eine Mitteilung über [ntfy](https://ntfy.sh) und zeigt alle Releases
+auf einer öffentlichen Seite. Eine Demo läuft unter
+[sgrm.godsapp.de/releases](https://sgrm.godsapp.de/releases).
 
-## Features
+## Funktionen
 
-- **GitHub Release Tracking**: Überwacht Repositories auf neue Releases
-- **Push-Benachrichtigungen**: Sofortige Notifications via ntfy.sh (self-hosted oder Cloud)
-- **Öffentliche Release-Übersicht**: Schöne Web-UI ohne Login erforderlich
-- **Admin-Dashboard**: Einfache Konfiguration über Web-Interface
-- **Dark Mode**: Vollständige Unterstützung
-- **Docker-ready**: Ein Container, keine Datenbank nötig
+- **Release-Überwachung** — Überwacht Repositories auf neue Releases
+- **Mitteilungen** — Sofortige Notifications via ntfy.sh (self-hosted oder Cloud)
+- **Öffentliche Übersicht** — Schöne Web-UI ohne Login erforderlich
+- **Verwaltung** — Einfache Konfiguration über Web-Interface
+- Hell und Dunkel
+- **Ein Container** — keine Datenbank nötig
 
-## Schnellstart
+## Installation
 
 ```bash
 docker run -d \
@@ -58,7 +57,7 @@ services:
     restart: unless-stopped
 ```
 
-## Konfiguration
+## Einrichtung
 
 Nach dem ersten Start:
 
@@ -79,15 +78,27 @@ Nach dem ersten Start:
 | Intervall | Prüfintervall in Sekunden (Standard: 3600) |
 | Base URL | Öffentliche URL deiner SGRM-Instanz (für Links in Notifications) |
 
-## API
+## Gut zu wissen
 
-SGRM bietet eine einfache JSON-API:
+- Beim ersten Check eines neu hinzugefügten Repositories wird nur eine Baseline gesetzt — benachrichtigt wird erst ab dem nächsten neuen Release.
+- Konfigurationsänderungen (Repos, Intervall, Token) wirken ohne Neustart ab dem nächsten Prüfzyklus.
+- Release-Notes werden serverseitig sanitisiert (XSS-Schutz auf den öffentlichen Seiten).
+- Login: nach 5 Fehlversuchen innerhalb von 15 Minuten wird die Client-IP für den Rest des Zeitfensters gesperrt.
+- Die Anwendung läuft im Container als Benutzer `sgrm` (UID 1000). Beim Start übernimmt sie die Config-/Data-Verzeichnisse per `chown`, bestehende Volumes funktionieren also ohne manuellen Eingriff.
 
-```
-GET /api/releases          # Alle Releases
-GET /api/releases/{slug}   # Einzelnes Release (z.B. owner-repo)
-GET /health                # Healthcheck (für Docker/Uptime-Monitoring)
-```
+## Versionen
+
+Was sich wann geändert hat, steht in [CHANGELOG.md](CHANGELOG.md) — nach
+[Keep a Changelog](https://keepachangelog.com/de/1.1.0/), aus Sicht der
+Nutzer:innen geschrieben. Die
+[Releases](https://github.com/Revisor01/sgrm/releases) fassen jede Version
+zusammen.
+
+## Selbst betreiben
+
+Das Image `revisoren/sgrm` auf Docker Hub ist der einfachste Weg (siehe
+Installation). Konfiguration und Daten liegen in zwei Verzeichnissen, eine
+Datenbank gibt es nicht.
 
 ### Umgebungsvariablen
 
@@ -105,20 +116,46 @@ pip install -r requirements.txt
 SGRM_CONFIG_DIR=./config SGRM_DATA_DIR=./data python web_interface.py
 ```
 
-## Deployment
+## Aufbau
 
-Push auf `main` löst den Workflow [`docker-publish.yml`](.github/workflows/docker-publish.yml) aus: Das Image wird gebaut, als `revisoren/sgrm:latest` (bei Tags zusätzlich mit Versions-Tag) zu Docker Hub gepusht und anschließend per Portainer-Webhook auf dem Zielserver neu ausgerollt.
+```
+sgrm
+├── web_interface.py   — Weboberfläche, Anmeldung, JSON-API (Flask)
+├── monitoring.py      — Prüfschleife: GitHub abfragen, ntfy benachrichtigen
+├── templates/ static/ — Seiten und Stylesheets
+├── start.sh           — startet beide Prozesse im Container ohne root
+└── Dockerfile
+```
 
-Benötigte Repository-Secrets: `DOCKERHUB_TOKEN` (Personal Access Token mit Write-Rechten) und `PORTAINER_WEBHOOK_URL`. Der Docker-Hub-Benutzer ist im Workflow fest hinterlegt.
+**Worauf es beim Bauen ankommt:**
+- **Zwei Prozesse, eine Datenlage.** Oberfläche und Prüfschleife teilen sich
+  nur die Dateien in `config/` und `data/`; Schreibzugriffe sind atomar.
+- **Release-Notes sind fremder Inhalt.** Sie werden vor der Anzeige bereinigt.
+- **Kein root im Container.**
 
-## Hinweise
+### API
 
-- Beim ersten Check eines neu hinzugefügten Repositories wird nur eine Baseline gesetzt — benachrichtigt wird erst ab dem nächsten neuen Release.
-- Konfigurationsänderungen (Repos, Intervall, Token) wirken ohne Neustart ab dem nächsten Prüfzyklus.
-- Release-Notes werden serverseitig sanitisiert (XSS-Schutz auf den öffentlichen Seiten).
-- Login: nach 5 Fehlversuchen innerhalb von 15 Minuten wird die Client-IP für den Rest des Zeitfensters gesperrt.
-- Die Anwendung läuft im Container als Benutzer `sgrm` (UID 1000). Beim Start übernimmt sie die Config-/Data-Verzeichnisse per `chown`, bestehende Volumes funktionieren also ohne manuellen Eingriff.
+SGRM bietet eine einfache JSON-API:
+
+```
+GET /api/releases          # Alle Releases
+GET /api/releases/{slug}   # Einzelnes Release (z.B. owner-repo)
+GET /health                # Healthcheck (für Docker/Uptime-Monitoring)
+```
+
+## Mitmachen
+
+Fehlermeldungen und Vorschläge sind willkommen — gern als
+[Issue](https://github.com/Revisor01/sgrm/issues). Sicherheitslücken bitte
+vertraulich melden, wie in [SECURITY.md](SECURITY.md) beschrieben. Pull
+Requests laufen durch einen Smoke-Test des Images und einen Secret-Scan; die
+Grundsätze für Beiträge stehen in [CLAUDE.md](CLAUDE.md).
 
 ## Lizenz
 
-AGPL-3.0 - siehe [LICENSE](LICENSE)
+SGRM steht unter der [GNU Affero General Public License v3.0](LICENSE).
+
+## Kontakt
+
+Pastor Simon Luthe · [mail@simonluthe.de](mailto:mail@simonluthe.de) ·
+[simonluthe.de](https://simonluthe.de)
