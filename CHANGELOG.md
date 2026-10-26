@@ -5,6 +5,11 @@ Alle nennenswerten Änderungen an SGRM werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 die Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [Unreleased]
+
+### Sonstiges
+- Englische Fassung der README und der Vorlagen für Fehlermeldungen.
+
 ## [1.3.0] - 2026-10-24
 
 ### Hinzugefügt
