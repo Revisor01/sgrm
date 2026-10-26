@@ -42,7 +42,7 @@ docker run -d \
   -p 8080:8080 \
   -v ./config:/app/config \
   -v ./data:/app/data \
-  revisoren/sgrm
+  ghcr.io/revisor01/sgrm
 ```
 
 Open http://localhost:8080 and sign in with `admin` / `admin` — or set
@@ -53,7 +53,7 @@ Open http://localhost:8080 and sign in with `admin` / `admin` — or set
 ```yaml
 services:
   sgrm:
-    image: revisoren/sgrm
+    image: ghcr.io/revisor01/sgrm
     ports:
       - "8080:8080"
     volumes:
@@ -106,7 +106,7 @@ What changed when is in [CHANGELOG.md](CHANGELOG.md) (in German, following
 
 ## Running it yourself
 
-The `revisoren/sgrm` image on Docker Hub is the simplest way (see Installation).
+The `ghcr.io/revisor01/sgrm` image is the simplest way (see Installation).
 Configuration and data live in two directories; there is no database.
 
 ### Environment variables
