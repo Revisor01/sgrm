@@ -7,6 +7,9 @@ die Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+### Geändert
+- Das Image liegt jetzt unter `ghcr.io/revisor01/sgrm` statt `revisoren/sgrm` auf Docker Hub; dort erscheinen keine neuen Versionen mehr.
+
 ### Sonstiges
 - Englische Fassung der README und der Vorlagen für Fehlermeldungen.
 

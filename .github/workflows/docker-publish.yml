@@ -27,9 +27,11 @@ permissions:
 jobs:
   image:
     uses: Revisor01/workflows/.github/workflows/docker-image.yml@9eb921a3c730493b1aea79d5b22bf655356d5e43 # 1.2.0
+    permissions:
+      contents: read
+      packages: write
     with:
-      image: revisoren/sgrm
-      registry-benutzer: revisoren
+      image: ghcr.io/revisor01/sgrm
       tags: |
         type=semver,pattern={{version}}
         type=semver,pattern={{major}}.{{minor}}
@@ -67,8 +69,6 @@ jobs:
         docker stop sgrm-smoke
         test $(( $(date +%s) - start )) -lt 8
         docker logs sgrm-smoke
-    secrets:
-      registry-token: ${{ secrets.DOCKERHUB_TOKEN }}
 
   deploy:
     needs: image

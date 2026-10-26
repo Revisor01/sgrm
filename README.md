@@ -42,7 +42,7 @@ docker run -d \
   -p 8080:8080 \
   -v ./config:/app/config \
   -v ./data:/app/data \
-  revisoren/sgrm
+  ghcr.io/revisor01/sgrm
 ```
 
 Öffne http://localhost:8080 und melde dich mit `admin` / `admin` an — oder setze beim ersten Start `-e SGRM_ADMIN_PASSWORD=...`, dann gilt dieses Passwort.
@@ -52,7 +52,7 @@ docker run -d \
 ```yaml
 services:
   sgrm:
-    image: revisoren/sgrm
+    image: ghcr.io/revisor01/sgrm
     ports:
       - "8080:8080"
     volumes:
@@ -100,7 +100,7 @@ zusammen.
 
 ## Selbst betreiben
 
-Das Image `revisoren/sgrm` auf Docker Hub ist der einfachste Weg (siehe
+Das Image `ghcr.io/revisor01/sgrm` ist der einfachste Weg (siehe
 Installation). Konfiguration und Daten liegen in zwei Verzeichnissen, eine
 Datenbank gibt es nicht.
 
