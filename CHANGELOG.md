@@ -103,3 +103,11 @@ die Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ### Hinzugefügt
 - Erstes Release: GitHub-Release-Tracking, ntfy-Push-Benachrichtigungen, öffentliche Release-Übersicht, Admin-Dashboard, Dark Mode, Docker-Image
+
+[Unreleased]: https://github.com/Revisor01/sgrm/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/Revisor01/sgrm/compare/v1.1.3...v1.2.0
+[1.1.3]: https://github.com/Revisor01/sgrm/compare/v1.1.2...v1.1.3
+[1.1.2]: https://github.com/Revisor01/sgrm/compare/v1.1.1...v1.1.2
+[1.1.1]: https://github.com/Revisor01/sgrm/compare/v1.1.0...v1.1.1
+[1.1.0]: https://github.com/Revisor01/sgrm/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/Revisor01/sgrm/releases/tag/v1.0.0
