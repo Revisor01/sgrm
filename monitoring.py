@@ -11,16 +11,13 @@ import yaml
 import asyncio
 import aiohttp
 
-# Konfiguration für das Logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-# Konfigurationsdatei und Datenverzeichnis
-# Über SGRM_CONFIG_DIR / SGRM_DATA_DIR überschreibbar (z. B. für lokale Tests);
-# die Defaults entsprechen den Volume-Mounts im Container.
+# Über SGRM_CONFIG_DIR / SGRM_DATA_DIR überschreibbar; Vorgabe sind die Volume-Mounts.
 CONFIG_DIR = os.environ.get("SGRM_CONFIG_DIR", "/app/config")
 DATA_DIR = os.environ.get("SGRM_DATA_DIR", "/app/data")
 CONFIG_FILE = f"{CONFIG_DIR}/config.yaml"
@@ -28,12 +25,10 @@ LAST_CHECK_FILE = f"{DATA_DIR}/last_checks.json"
 RELEASES_FILE = f"{DATA_DIR}/releases.json"
 LOCK_FILE = f"{DATA_DIR}/.check.lock"
 
-# Stellt sicher, dass die Verzeichnisse existieren
 os.makedirs(CONFIG_DIR, exist_ok=True)
 os.makedirs(DATA_DIR, exist_ok=True)
 
-# Untergrenze für das Prüfintervall, damit ein versehentlich zu kleiner Wert
-# (z. B. 0) nicht in einer Endlosschleife die GitHub-API flutet
+# Untergrenze, damit ein Intervall von 0 nicht die GitHub-API flutet.
 MIN_CHECK_INTERVAL = 60
 
 def write_atomic(path, write_fn):
@@ -254,7 +249,6 @@ class GitHubMonitor:
                 author = release.get('author') or {}
                 logger.info(f"Letztes Release für {repo}: {tag_name} vom {published_at}")
 
-                # Release-Daten für API speichern
                 release_data = {
                     'tag_name': tag_name,
                     'name': release.get('name') or tag_name,
@@ -275,7 +269,6 @@ class GitHubMonitor:
                 }
                 DataManager.save_release(repo, release_data)
 
-                # Prüfen, ob das Release neu ist
                 last_check = DataManager.load_last_checks().get('github', {}).get(repo)
                 logger.info(f"Letzter Check für {repo}: {last_check}")
 
@@ -287,11 +280,9 @@ class GitHubMonitor:
                 elif published_at != last_check:
                     logger.info(f"Neues Release gefunden für {repo}: {tag_name}")
 
-                    # Link zur eigenen Release-Seite
                     repo_slug = repo.replace('/', '-')
                     release_url = f"{self.base_url}/releases/{repo_slug}" if self.base_url else release['html_url']
 
-                    # Kurze Beschreibung für Push
                     body_preview = body[:200]
                     if len(body) > 200:
                         body_preview += '...'
@@ -313,8 +304,7 @@ class GitHubMonitor:
                     )
                     logger.info(f"GitHub Release Benachrichtigung gesendet für {repo}, Status: {status_code}")
 
-                    # Zeitstempel nur bei erfolgreicher Zustellung fortschreiben,
-                    # sonst wird die Benachrichtigung im nächsten Zyklus erneut versucht
+                    # Nur bei erfolgreicher Zustellung fortschreiben, sonst im nächsten Zyklus erneut.
                     if status_code == 200:
                         DataManager.set_last_check(repo, published_at)
                     else:
@@ -333,11 +323,8 @@ class GitHubMonitor:
         """Prüft alle konfigurierten Repositories auf neue Releases"""
         logger.info("Starte GitHub Release Check")
 
-        # Sperre über den gesamten Durchlauf; ein zweiter Check (Web-UI bzw.
-        # Monitoring-Loop) wartet, bis der laufende fertig ist. Das Blockieren
-        # ist unkritisch, da in diesem Event-Loop sonst nichts läuft.
+        # Sperre über den ganzen Durchlauf, damit Web-UI und Loop nicht parallel prüfen.
         with data_lock():
-            # Parallele Anfragen für alle Repositories
             timeout = aiohttp.ClientTimeout(total=30)
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 tasks = [self.check_repo(session, repo) for repo in self.repos]
@@ -374,7 +361,6 @@ class MonitoringService:
                 logger.error(traceback.format_exc())
                 await asyncio.sleep(min(interval, 60))
 
-# Diese Funktionen sind für die Integration mit der Web-UI
 def check_github():
     """Führt einen GitHub-Check durch (wird von der Web-UI aufgerufen)"""
     logger.info("Manueller GitHub-Check gestartet")
@@ -402,7 +388,6 @@ def get_sorted_repos():
     repos = config['github']['repos']
     last_checks = DataManager.load_last_checks()
     
-    # Sortieren der Repos nach Zeitstempel (neueste zuerst)
     def get_timestamp(repo):
         timestamp = last_checks.get('github', {}).get(repo, "")
         return timestamp if timestamp else "0000-00-00T00:00:00Z"
