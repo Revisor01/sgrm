@@ -81,7 +81,7 @@ Nach dem ersten Start:
 - Konfigurationsänderungen (Repos, Intervall, Token) wirken ohne Neustart ab dem nächsten Prüfzyklus.
 - Release-Notes werden serverseitig sanitisiert (XSS-Schutz auf den öffentlichen Seiten).
 - Login: nach 5 Fehlversuchen innerhalb von 15 Minuten wird die Client-IP für den Rest des Zeitfensters gesperrt.
-- Die Anwendung läuft im Container als Benutzer `sgrm` (UID 1000). Beim Start übernimmt sie die Config-/Data-Verzeichnisse per `chown`, bestehende Volumes funktionieren also ohne manuellen Eingriff.
+- Die Anwendung läuft im Container als Benutzer `sgrm` (UID 1000) und übernimmt beim Start die Config-/Data-Verzeichnisse per `chown`.
 
 ## Versionen
 
@@ -98,7 +98,7 @@ zusammen.
 | `SGRM_CONFIG_DIR` | `/app/config` | Verzeichnis für `config.yaml`, `users.json` und `secret_key` |
 | `SGRM_DATA_DIR` | `/app/data` | Verzeichnis für `releases.json` und `last_checks.json` |
 | `SGRM_ADMIN_PASSWORD` | `admin` | Startpasswort des Admin-Benutzers. Wirkt nur beim ersten Start (solange noch keine `users.json` existiert) |
-| `SGRM_TRUSTED_PROXIES` | `0` | Anzahl vorgeschalteter Reverse Proxies (z. B. `1` hinter Traefik/nginx). Nötig, damit die Login-Begrenzung die echte Client-IP aus `X-Forwarded-For` nutzt — sonst teilen sich alle Clients die IP des Proxys |
+| `SGRM_TRUSTED_PROXIES` | `0` | Anzahl vorgeschalteter Reverse Proxies (z. B. `1` hinter Traefik/nginx); die Login-Begrenzung nutzt dann die Client-IP aus `X-Forwarded-For` |
 
 Im Container müssen beide nicht gesetzt werden — die Standardwerte entsprechen den Volume-Mounts. Für einen lokalen Start ohne Docker:
 
