@@ -1,7 +1,5 @@
 # Mitmachen
 
-**Deutsch** · [English](#contributing)
-
 Fehlermeldungen, Vorschläge und Pull Requests sind willkommen.
 
 - Fehler und Ideen bitte als [Issue](../../issues/new/choose) melden,
@@ -15,22 +13,4 @@ Fehlermeldungen, Vorschläge und Pull Requests sind willkommen.
 ## Lizenz der Beiträge
 
 Beiträge stehen unter derselben Lizenz wie SGRM, der
-[GNU Affero General Public License v3.0](LICENSE).
-
----
-
-# Contributing
-
-Bug reports, suggestions and pull requests are welcome.
-
-- Please report bugs and ideas as an [issue](../../issues/new/choose) and
-  security issues privately as described in [SECURITY.md](SECURITY.md).
-- One pull request per topic. Tests and a secret scan run in CI; changes that
-  users notice go into `CHANGELOG.md` under `[Unreleased]`.
-- Commits follow [Conventional Commits](https://www.conventionalcommits.org/),
-  in English or German.
-
-## License of contributions
-
-Contributions are licensed under the same license as SGRM, the
 [GNU Affero General Public License v3.0](LICENSE).

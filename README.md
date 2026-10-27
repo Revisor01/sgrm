@@ -5,10 +5,6 @@
 </p>
 
 <p align="center">
-  <b>Deutsch</b> · <a href="README.en.md">English</a>
-</p>
-
-<p align="center">
   <img src="https://img.shields.io/github/actions/workflow/status/Revisor01/sgrm/docker-publish.yml?logo=github" alt="Build">
   <img src="https://img.shields.io/badge/Python-3.13-blue?logo=python" alt="Python">
   <img src="https://img.shields.io/badge/Docker-ready-blue?logo=docker" alt="Docker">
