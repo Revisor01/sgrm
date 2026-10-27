@@ -37,8 +37,7 @@ jobs:
         type=semver,pattern={{major}}.{{minor}}
         type=raw,value=latest,enable={{is_default_branch}}
         type=raw,value=${{ inputs.image_tag }},enable=${{ github.event_name == 'workflow_dispatch' && inputs.image_tag != '' }}
-      # Startet das Image wie ein Update von einer Version, die noch als root
-      # lief, und prüft Rechte, Endpunkte und ein schnelles Beenden.
+      # Startet das Image wie ein Update von einer root-Version und prüft Rechte, Endpunkte und Beenden.
       pruefung: |
         mkdir -p smoke/config smoke/data
         echo '{}' | sudo tee smoke/data/releases.json > /dev/null

@@ -1,6 +1,6 @@
 version: 2
 updates:
-  # Python-Abhängigkeiten (requirements.txt) – gebündelt in einem PR pro Monat
+  # Python-Abhängigkeiten, gebündelt in einem PR pro Monat
   - package-ecosystem: "pip"
     directory: "/"
     schedule:

@@ -14,7 +14,6 @@ from flask_login import LoginManager, UserMixin, login_required, login_user, log
 from werkzeug.middleware.proxy_fix import ProxyFix
 import secrets
 
-# Import der bestehenden Monitoring-Funktionen
 from monitoring import (check_github, load_last_checks, get_sorted_repos, load_releases, DataManager,
                         write_atomic, MIN_CHECK_INTERVAL)
 import markdown
@@ -22,19 +21,15 @@ import nh3
 
 logger = logging.getLogger(__name__)
 
-# Konfigurationsdatei
-# Über SGRM_CONFIG_DIR / SGRM_DATA_DIR überschreibbar (z. B. für lokale Tests);
-# die Defaults entsprechen den Volume-Mounts im Container.
+# Über SGRM_CONFIG_DIR / SGRM_DATA_DIR überschreibbar; Vorgabe sind die Volume-Mounts.
 CONFIG_DIR = os.environ.get("SGRM_CONFIG_DIR", "/app/config")
 DATA_DIR = os.environ.get("SGRM_DATA_DIR", "/app/data")
 CONFIG_FILE = f"{CONFIG_DIR}/config.yaml"
 USERS_FILE = f"{CONFIG_DIR}/users.json"
 
-# Stellt sicher, dass die Verzeichnisse existieren
 os.makedirs(CONFIG_DIR, exist_ok=True)
 os.makedirs(DATA_DIR, exist_ok=True)
 
-# Standardkonfiguration
 DEFAULT_CONFIG = {
     "github": {
         "token": "",
@@ -51,7 +46,6 @@ DEFAULT_CONFIG = {
     }
 }
 
-# Login-Begrenzung: max. Fehlversuche pro Client-IP innerhalb des Zeitfensters
 LOGIN_MAX_ATTEMPTS = 5
 LOGIN_WINDOW_SECONDS = 15 * 60
 
@@ -70,7 +64,6 @@ def get_secret_key():
     write_atomic(SECRET_KEY_FILE, lambda f: f.write(key))
     return key
 
-# Flask App initialisieren
 app = Flask(__name__)
 app.secret_key = get_secret_key()
 app.config.update(
@@ -78,8 +71,7 @@ app.config.update(
     REMEMBER_COOKIE_SAMESITE='Lax',
     REMEMBER_COOKIE_HTTPONLY=True,
 )
-# Hinter einem Reverse Proxy (Traefik, nginx, ...) die Anzahl der Proxies setzen,
-# damit die echte Client-IP (X-Forwarded-For) für die Login-Begrenzung genutzt wird
+# Hinter einem Reverse Proxy, damit die Login-Begrenzung die echte Client-IP sieht.
 trusted_proxies = int(os.environ.get("SGRM_TRUSTED_PROXIES", "0") or 0)
 if trusted_proxies > 0:
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=trusted_proxies, x_proto=trusted_proxies)
@@ -88,35 +80,30 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "login"
 
-# Benutzermodell
 class User(UserMixin):
     def __init__(self, id, username, password_hash):
         self.id = id
         self.username = username
         self.password_hash = password_hash
 
-# Lade oder erstelle Konfiguration
 def load_config():
     try:
         with open(CONFIG_FILE, 'r') as f:
             config = yaml.safe_load(f)
             return config
     except FileNotFoundError:
-        # Erstelle Standardkonfiguration, wenn keine existiert
         save_config(DEFAULT_CONFIG)
         return DEFAULT_CONFIG
 
-# Speichere Konfiguration
 def save_config(config):
     write_atomic(CONFIG_FILE, lambda f: yaml.dump(config, f))
 
-# Lade oder erstelle Benutzer
 def load_users():
     try:
         with open(USERS_FILE, 'r') as f:
             return json.load(f)
     except FileNotFoundError:
-        # Erstelle Standard-Admin-Benutzer (Startpasswort per SGRM_ADMIN_PASSWORD)
+        # Startpasswort per SGRM_ADMIN_PASSWORD
         admin_password = os.environ.get("SGRM_ADMIN_PASSWORD", "")
         if not admin_password:
             admin_password = "admin"
@@ -131,11 +118,9 @@ def load_users():
         save_users(default_users)
         return default_users
 
-# Speichere Benutzer
 def save_users(users):
     write_atomic(USERS_FILE, lambda f: json.dump(users, f))
 
-# Benutzer-Loader für Flask-Login
 @login_manager.user_loader
 def load_user(user_id):
     users = load_users()
@@ -144,22 +129,18 @@ def load_user(user_id):
             return User(user_id, username, user_data["password_hash"])
     return None
 
-# Routen
 @app.route('/')
 @login_required
 def index():
     config = load_config()
 
-    # Lade letzte Checks
     last_checks = load_last_checks()
 
-    # Formatiere die Datumsangaben für die Anzeige
     for repo, published_at in last_checks.get('github', {}).items():
         if published_at and not repo.startswith('last_'):
             dt = datetime.fromisoformat(published_at.replace('Z', '+00:00'))
             last_checks['github'][repo] = dt.strftime('%d.%m.%Y %H:%M')
 
-    # Sortierte Repositories
     sorted_repos = get_sorted_repos()
 
     return render_template(
@@ -173,18 +154,15 @@ def index():
 @login_required
 def config():
     if request.method == 'POST':
-        # Konfiguration aktualisieren
         config = load_config()
 
-        # GitHub-Konfiguration (Repos werden separat verwaltet)
+        # Repos werden separat verwaltet.
         config['github']['token'] = request.form.get('github_token', '')
         config['github']['ntfy_topic'] = request.form.get('github_ntfy_topic', 'github')
 
-        # Ntfy-Konfiguration
         config['ntfy']['token'] = request.form.get('ntfy_token', '')
         config['ntfy']['base_url'] = request.form.get('ntfy_base_url', 'https://ntfy.sh')
 
-        # Allgemeine Konfiguration
         try:
             check_interval = int(request.form.get('check_interval', 3600))
         except ValueError:
@@ -192,7 +170,6 @@ def config():
         config['general']['check_interval'] = max(check_interval, MIN_CHECK_INTERVAL)
         config['general']['base_url'] = request.form.get('base_url', '').rstrip('/')
 
-        # Konfiguration speichern
         save_config(config)
         flash('Konfiguration erfolgreich gespeichert!', 'success')
         return redirect(url_for('config'))
@@ -205,23 +182,19 @@ def config():
 def add_repo():
     repo = request.form.get('repo', '').strip()
     if repo:
-        # GitHub URL zu owner/repo konvertieren
         for prefix in ('https://github.com/', 'http://github.com/', 'github.com/'):
             if repo.startswith(prefix):
                 repo = repo[len(prefix):]
                 break
 
-        # Trailing slashes und .git entfernen
         repo = repo.rstrip('/')
         if repo.endswith('.git'):
             repo = repo[:-4]
 
-        # Nur owner/repo behalten (falls weitere Pfade wie /releases dabei sind)
         parts = repo.split('/')
         if len(parts) >= 2:
             repo = f"{parts[0]}/{parts[1]}"
 
-        # Validierung: muss owner/repo Format mit gültigen GitHub-Namen haben
         owner, _, name = repo.partition('/')
         if (len(repo) <= 255
                 and re.fullmatch(r'[A-Za-z0-9-]+', owner) and not owner.startswith('-')
@@ -270,7 +243,6 @@ def users():
             elif username in users_data:
                 flash('Benutzername existiert bereits!', 'danger')
             else:
-                # Generiere neue ID
                 user_id = str(max([int(u['id']) for u in users_data.values()]) + 1)
                 users_data[username] = {
                     "id": user_id,
@@ -376,9 +348,7 @@ def health():
     """Healthcheck-Endpoint für Docker/Monitoring"""
     return jsonify({'status': 'ok'})
 
-# ============================================
-# Öffentliche API & Release-Seiten (kein Login)
-# ============================================
+# Öffentliche API und Release-Seiten, ohne Login
 
 def format_relative_time(iso_timestamp):
     """Formatiert einen ISO-Timestamp als relative Zeit"""
@@ -413,7 +383,6 @@ def render_markdown(text):
     html = markdown.markdown(text, extensions=['fenced_code', 'tables', 'nl2br'])
     return nh3.clean(html)
 
-# API-Endpunkte
 @app.route('/api/releases')
 def api_releases():
     """API: Alle Releases"""
@@ -429,7 +398,6 @@ def api_releases():
             release_data['relative_time'] = format_relative_time(release_data.get('published_at', ''))
             result.append(release_data)
 
-    # Sortieren nach published_at (neueste zuerst)
     result.sort(key=lambda x: x.get('published_at', ''), reverse=True)
     return jsonify(result)
 
@@ -438,7 +406,6 @@ def api_release_detail(repo_slug):
     """API: Einzelnes Release"""
     releases = load_releases()
 
-    # Finde das Repo anhand des Slugs
     repo_name = None
     for repo in releases.keys():
         if repo.replace('/', '-') == repo_slug:
@@ -453,7 +420,6 @@ def api_release_detail(repo_slug):
 
     return jsonify({'error': 'Release not found'}), 404
 
-# Öffentliche Web-Seiten
 @app.route('/releases')
 def releases_page():
     """Öffentliche Übersichtsseite aller Releases"""
@@ -468,15 +434,12 @@ def releases_page():
             release_data['repo'] = repo
             release_data['repo_slug'] = repo.replace('/', '-')
             release_data['relative_time'] = format_relative_time(release_data.get('published_at', ''))
-            # Markdown-Vorschau des Changelogs
             body = release_data.get('body', '')
             if body:
-                # Erste 200 Zeichen als Markdown rendern
                 preview = body[:200] + ('...' if len(body) > 200 else '')
                 release_data['body_preview_html'] = render_markdown(preview)
             releases_list.append(release_data)
 
-    # Sortieren nach published_at (neueste zuerst)
     releases_list.sort(key=lambda x: x.get('published_at', ''), reverse=True)
 
     return render_template('releases.html', releases=releases_list)
@@ -486,7 +449,6 @@ def release_detail_page(repo_slug):
     """Öffentliche Detailseite für ein Release"""
     releases = load_releases()
 
-    # Finde das Repo anhand des Slugs
     repo_name = None
     for repo in releases.keys():
         if repo.replace('/', '-') == repo_slug:
@@ -494,7 +456,6 @@ def release_detail_page(repo_slug):
             break
 
     if not repo_name:
-        # Fallback: Zeige den Slug für Fehlermeldung
         return render_template('release_not_found.html', repo=repo_slug.replace('-', '/', 1)), 404
 
     release_data = releases[repo_name].copy()
@@ -503,7 +464,6 @@ def release_detail_page(repo_slug):
     release_data['relative_time'] = format_relative_time(release_data.get('published_at', ''))
     release_data['body_html'] = render_markdown(release_data.get('body', ''))
 
-    # Formatiere Asset-Größen
     for asset in release_data.get('assets', []):
         size_bytes = asset.get('size', 0)
         if size_bytes > 1024 * 1024:
@@ -515,7 +475,6 @@ def release_detail_page(repo_slug):
 
     return render_template('release_detail.html', release=release_data)
 
-# Beim Start Standard-Konfiguration und Admin-User anlegen, falls noch nicht vorhanden
 load_config()
 load_users()
 

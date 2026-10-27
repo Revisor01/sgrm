@@ -14,21 +14,18 @@
 
 ## Worum es geht
 
-Wer Software selbst betreibt, will wissen, wann es eine neue Version gibt —
-für viele Projekte auf GitHub, ohne jedes einzeln zu beobachten. SGRM prüft
-die eingetragenen Repositories in festen Abständen, schickt bei einem neuen
-Release eine Mitteilung über [ntfy](https://ntfy.sh) und zeigt alle Releases
-auf einer öffentlichen Seite. Eine Demo läuft unter
+SGRM prüft eingetragene GitHub-Repositories in festen Abständen, meldet neue
+Releases über [ntfy](https://ntfy.sh) und zeigt sie auf einer öffentlichen
+Seite. Eine Demo läuft unter
 [sgrm.godsapp.de/releases](https://sgrm.godsapp.de/releases).
 
 ## Funktionen
 
-- **Release-Überwachung** — Überwacht Repositories auf neue Releases
-- **Mitteilungen** — Sofortige Notifications via ntfy.sh (self-hosted oder Cloud)
-- **Öffentliche Übersicht** — Schöne Web-UI ohne Login erforderlich
-- **Verwaltung** — Einfache Konfiguration über Web-Interface
+- Mitteilungen über ntfy (eigener Server oder ntfy.sh)
+- Öffentliche Release-Übersicht ohne Login
+- Verwaltung über die Weboberfläche
 - Hell und Dunkel
-- **Ein Container** — keine Datenbank nötig
+- Ein Container, keine Datenbank
 
 ## Installation
 
@@ -88,17 +85,11 @@ Nach dem ersten Start:
 
 ## Versionen
 
-Was sich wann geändert hat, steht in [CHANGELOG.md](CHANGELOG.md) — nach
-[Keep a Changelog](https://keepachangelog.com/de/1.1.0/), aus Sicht der
-Nutzer:innen geschrieben. Die
+Was sich wann geändert hat, steht in [CHANGELOG.md](CHANGELOG.md). Die
 [Releases](https://github.com/Revisor01/sgrm/releases) fassen jede Version
 zusammen.
 
 ## Selbst betreiben
-
-Das Image `ghcr.io/revisor01/sgrm` ist der einfachste Weg (siehe
-Installation). Konfiguration und Daten liegen in zwei Verzeichnissen, eine
-Datenbank gibt es nicht.
 
 ### Umgebungsvariablen
 
