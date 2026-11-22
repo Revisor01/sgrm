@@ -10,6 +10,9 @@ die Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 ### Geändert
 - Das Image liegt jetzt unter `ghcr.io/revisor01/sgrm` statt `revisoren/sgrm` auf Docker Hub; dort erscheinen keine neuen Versionen mehr.
 
+### Behoben
+- Hinter Reverse Proxies (`SGRM_TRUSTED_PROXIES`) sperrte die Login-Begrenzung nach fünf Fehlversuchen alle statt nur den betroffenen Client, weil die echte Client-Adresse verloren ging.
+
 ### Sonstiges
 - README, Vorlagen und Hinweise gibt es nur noch auf Deutsch.
 

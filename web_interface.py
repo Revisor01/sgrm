@@ -475,9 +475,13 @@ def release_detail_page(repo_slug):
 
     return render_template('release_detail.html', release=release_data)
 
+def waitress_optionen():
+    # waitress verwirft X-Forwarded-* sonst vor ProxyFix; ProxyFix wertet nur die vertrauten Einträge von rechts aus.
+    return {"clear_untrusted_proxy_headers": False} if trusted_proxies > 0 else {}
+
 load_config()
 load_users()
 
 if __name__ == '__main__':
     from waitress import serve
-    serve(app, host='0.0.0.0', port=8080, threads=8)
+    serve(app, host='0.0.0.0', port=8080, threads=8, **waitress_optionen())
